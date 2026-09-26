@@ -2104,7 +2104,6 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         GUI.defaultOutputFolderButton.clicked.connect(self.selectDefaultOutputFolder)
         GUI.clearButton.clicked.connect(self.clearJobs)
         GUI.fileButton.clicked.connect(self.selectInput)
-        GUI.directoryButton.clicked.connect(self.selectDir)
         GUI.jobList.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         GUI.jobList.customContextMenuRequested.connect(self.showJobListContextMenu)
         self.deleteJobShortcut = QShortcut(QKeySequence('Delete'), GUI.jobList)

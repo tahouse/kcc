@@ -160,19 +160,6 @@ class Ui_mainWindow(object):
         self.gridLayout_4 = QGridLayout(self.buttonWidget)
         self.gridLayout_4.setObjectName(u"gridLayout_4")
         self.gridLayout_4.setContentsMargins(0, 0, 0, 0)
-        self.directoryButton = QPushButton(self.buttonWidget)
-        self.directoryButton.setObjectName(u"directoryButton")
-        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        sizePolicy3.setHorizontalStretch(0)
-        sizePolicy3.setVerticalStretch(0)
-        sizePolicy3.setHeightForWidth(self.directoryButton.sizePolicy().hasHeightForWidth())
-        self.directoryButton.setSizePolicy(sizePolicy3)
-        icon1 = QIcon()
-        icon1.addFile(u":/Other/icons/folder_new.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.directoryButton.setIcon(icon1)
-
-        self.gridLayout_4.addWidget(self.directoryButton, 0, 4, 1, 1)
-
         self.formatBox = QComboBox(self.buttonWidget)
         self.formatBox.setObjectName(u"formatBox")
         self.formatBox.setMinimumSize(QSize(0, 28))
@@ -188,18 +175,18 @@ class Ui_mainWindow(object):
         self.clearButton = QPushButton(self.buttonWidget)
         self.clearButton.setObjectName(u"clearButton")
         self.clearButton.setMinimumSize(QSize(0, 30))
-        icon2 = QIcon()
-        icon2.addFile(u":/Other/icons/clear.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.clearButton.setIcon(icon2)
+        icon1 = QIcon()
+        icon1.addFile(u":/Other/icons/clear.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.clearButton.setIcon(icon1)
 
         self.gridLayout_4.addWidget(self.clearButton, 0, 3, 1, 1)
 
         self.fileButton = QPushButton(self.buttonWidget)
         self.fileButton.setObjectName(u"fileButton")
         self.fileButton.setMinimumSize(QSize(0, 30))
-        icon3 = QIcon()
-        icon3.addFile(u":/Other/icons/document_new.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.fileButton.setIcon(icon3)
+        icon2 = QIcon()
+        icon2.addFile(u":/Other/icons/document_new.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.fileButton.setIcon(icon2)
 
         self.gridLayout_4.addWidget(self.fileButton, 0, 1, 1, 1)
 
@@ -209,9 +196,9 @@ class Ui_mainWindow(object):
         font = QFont()
         font.setBold(True)
         self.convertButton.setFont(font)
-        icon4 = QIcon()
-        icon4.addFile(u":/Other/icons/convert.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.convertButton.setIcon(icon4)
+        icon3 = QIcon()
+        icon3.addFile(u":/Other/icons/convert.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.convertButton.setIcon(icon3)
 
         self.gridLayout_4.addWidget(self.convertButton, 1, 3, 1, 1)
 
@@ -219,7 +206,6 @@ class Ui_mainWindow(object):
         self.deviceBox.raise_()
         self.convertButton.raise_()
         self.fileButton.raise_()
-        self.directoryButton.raise_()
         self.formatBox.raise_()
 
         self.gridLayout.addWidget(self.buttonWidget, 3, 0, 1, 2)
@@ -264,11 +250,11 @@ class Ui_mainWindow(object):
 
         self.languageEdit = QLineEdit(self.optionWidget)
         self.languageEdit.setObjectName(u"languageEdit")
-        sizePolicy4 = QSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        sizePolicy4.setHorizontalStretch(0)
-        sizePolicy4.setVerticalStretch(0)
-        sizePolicy4.setHeightForWidth(self.languageEdit.sizePolicy().hasHeightForWidth())
-        self.languageEdit.setSizePolicy(sizePolicy4)
+        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        sizePolicy3.setHorizontalStretch(0)
+        sizePolicy3.setVerticalStretch(0)
+        sizePolicy3.setHeightForWidth(self.languageEdit.sizePolicy().hasHeightForWidth())
+        self.languageEdit.setSizePolicy(sizePolicy3)
         self.languageEdit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.languageEdit.setClearButtonEnabled(False)
 
@@ -313,8 +299,8 @@ class Ui_mainWindow(object):
 
         self.authorEdit = QLineEdit(self.optionWidget)
         self.authorEdit.setObjectName(u"authorEdit")
-        sizePolicy4.setHeightForWidth(self.authorEdit.sizePolicy().hasHeightForWidth())
-        self.authorEdit.setSizePolicy(sizePolicy4)
+        sizePolicy3.setHeightForWidth(self.authorEdit.sizePolicy().hasHeightForWidth())
+        self.authorEdit.setSizePolicy(sizePolicy3)
         self.authorEdit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.authorEdit.setClearButtonEnabled(False)
 
@@ -395,7 +381,9 @@ class Ui_mainWindow(object):
         self.defaultOutputFolderButton = QPushButton(self.outputFolderWidget)
         self.defaultOutputFolderButton.setObjectName(u"defaultOutputFolderButton")
         self.defaultOutputFolderButton.setMinimumSize(QSize(0, 30))
-        self.defaultOutputFolderButton.setIcon(icon1)
+        icon4 = QIcon()
+        icon4.addFile(u":/Other/icons/folder_new.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.defaultOutputFolderButton.setIcon(icon4)
 
         self.horizontalLayout_3.addWidget(self.defaultOutputFolderButton)
 
@@ -467,8 +455,8 @@ class Ui_mainWindow(object):
 
         self.titleEdit = QLineEdit(self.optionWidget)
         self.titleEdit.setObjectName(u"titleEdit")
-        sizePolicy4.setHeightForWidth(self.titleEdit.sizePolicy().hasHeightForWidth())
-        self.titleEdit.setSizePolicy(sizePolicy4)
+        sizePolicy3.setHeightForWidth(self.titleEdit.sizePolicy().hasHeightForWidth())
+        self.titleEdit.setSizePolicy(sizePolicy3)
         self.titleEdit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.titleEdit.setClearButtonEnabled(False)
 
@@ -596,8 +584,8 @@ class Ui_mainWindow(object):
 
         self.chunkSizeWidget = QWidget(self.centralWidget)
         self.chunkSizeWidget.setObjectName(u"chunkSizeWidget")
-        sizePolicy4.setHeightForWidth(self.chunkSizeWidget.sizePolicy().hasHeightForWidth())
-        self.chunkSizeWidget.setSizePolicy(sizePolicy4)
+        sizePolicy3.setHeightForWidth(self.chunkSizeWidget.sizePolicy().hasHeightForWidth())
+        self.chunkSizeWidget.setSizePolicy(sizePolicy3)
         self.chunkSizeWidget.setVisible(False)
         self.horizontalLayout_4 = QHBoxLayout(self.chunkSizeWidget)
         self.horizontalLayout_4.setSpacing(0)
@@ -605,11 +593,11 @@ class Ui_mainWindow(object):
         self.horizontalLayout_4.setContentsMargins(0, 0, 0, 0)
         self.chunkSizeLabel = QLabel(self.chunkSizeWidget)
         self.chunkSizeLabel.setObjectName(u"chunkSizeLabel")
-        sizePolicy5 = QSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
-        sizePolicy5.setHorizontalStretch(0)
-        sizePolicy5.setVerticalStretch(0)
-        sizePolicy5.setHeightForWidth(self.chunkSizeLabel.sizePolicy().hasHeightForWidth())
-        self.chunkSizeLabel.setSizePolicy(sizePolicy5)
+        sizePolicy4 = QSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
+        sizePolicy4.setHorizontalStretch(0)
+        sizePolicy4.setVerticalStretch(0)
+        sizePolicy4.setHeightForWidth(self.chunkSizeLabel.sizePolicy().hasHeightForWidth())
+        self.chunkSizeLabel.setSizePolicy(sizePolicy4)
 
         self.horizontalLayout_4.addWidget(self.chunkSizeLabel)
 
@@ -623,8 +611,8 @@ class Ui_mainWindow(object):
 
         self.chunkSizeWarnLabel = QLabel(self.chunkSizeWidget)
         self.chunkSizeWarnLabel.setObjectName(u"chunkSizeWarnLabel")
-        sizePolicy5.setHeightForWidth(self.chunkSizeWarnLabel.sizePolicy().hasHeightForWidth())
-        self.chunkSizeWarnLabel.setSizePolicy(sizePolicy5)
+        sizePolicy4.setHeightForWidth(self.chunkSizeWarnLabel.sizePolicy().hasHeightForWidth())
+        self.chunkSizeWarnLabel.setSizePolicy(sizePolicy4)
 
         self.horizontalLayout_4.addWidget(self.chunkSizeWarnLabel)
 
@@ -706,10 +694,6 @@ class Ui_mainWindow(object):
         self.keepSourceResolutionBox.setToolTip(QCoreApplication.translate("mainWindow", u"Keep each source image's resolution instead of resizing it to the selected device profile. Other enabled image processing still applies.", None))
 #endif // QT_CONFIG(tooltip)
         self.keepSourceResolutionBox.setText(QCoreApplication.translate("mainWindow", u"Keep source resolution", None))
-#if QT_CONFIG(tooltip)
-        self.directoryButton.setToolTip(QCoreApplication.translate("mainWindow", u"Recursively add selected file types from one or more folders.", None))
-#endif // QT_CONFIG(tooltip)
-        self.directoryButton.setText(QCoreApplication.translate("mainWindow", u"Add folder recursively", None))
 #if QT_CONFIG(tooltip)
         self.formatBox.setToolTip(QCoreApplication.translate("mainWindow", u"<html><head/><body><p style='white-space:pre'>Output format.</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
