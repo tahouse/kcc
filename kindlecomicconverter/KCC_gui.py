@@ -70,6 +70,15 @@ def isDuplicateLinkedMessage(message, item_text, existing_messages):
     return '<a ' in message.lower() and item_text in existing_messages
 
 
+IMAGE_PROCESSING_WIDGETS = (
+    'autoLevelBox', 'autocontrastBox', 'borderBox', 'eraseRainbowBox', 'forcePngRgbBox',
+    'gammaBox', 'gammaWidget', 'interPanelCropBox', 'keepSpreadsCombinedBox',
+    'legacyPanelViewBox', 'lightnovelBox', 'maximizeStrips', 'mozJpegBox', 'noQuantizeBox',
+    'noRotateBox', 'pngLegacyBox', 'qualityBox', 'rotateFirstBox', 'rotateRightBox',
+    'rotateBox', 'upscaleBox', 'vertical4PanelBox', 'wallpaperBox', 'webpBox', 'webtoonBox',
+)
+
+
 class QApplicationMessaging(QApplication):
     messageFromOtherInstance = Signal(bytes)
 
@@ -320,7 +329,7 @@ def get_options():
     options.format = gui_current_format
     if GUI.mangaBox.isChecked():
         options.righttoleft = True
-    if GUI.lightnovelBox.isChecked():
+    if GUI.lightnovelBox.isChecked() and not GUI.disableProcessingBox.isChecked():
         options.lightnovel = True
     if GUI.wallpaperBox.isChecked():
         options.wallpaper = True
@@ -340,7 +349,7 @@ def get_options():
         options.legacypanelview = True
     if GUI.vertical4PanelBox.isChecked():
         options.vertical4panel = True
-    if GUI.webtoonBox.isChecked():
+    if GUI.webtoonBox.isChecked() and not GUI.disableProcessingBox.isChecked():
         options.webtoon = True
     if GUI.upscaleBox.checkState() == Qt.CheckState.PartiallyChecked:
         options.stretch = True
@@ -1236,6 +1245,23 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         GUI.rotateBox.setEnabled(custom_spread_mode)
         GUI.noRotateBox.setEnabled(custom_spread_mode)
 
+    def toggleDisableProcessing(self, state):
+        processing_disabled = state != Qt.CheckState.Unchecked.value
+        if processing_disabled:
+            if not hasattr(self, '_processingWidgetEnabledStates'):
+                self._processingWidgetEnabledStates = {
+                    name: getattr(GUI, name).isEnabled() for name in IMAGE_PROCESSING_WIDGETS
+                }
+            for name in IMAGE_PROCESSING_WIDGETS:
+                getattr(GUI, name).setEnabled(False)
+        else:
+            if not hasattr(self, '_processingWidgetEnabledStates'):
+                return
+            enabled_states = self._processingWidgetEnabledStates
+            for name in IMAGE_PROCESSING_WIDGETS:
+                getattr(GUI, name).setEnabled(enabled_states[name])
+            del self._processingWidgetEnabledStates
+
     def modeConvert(self, enable):
         if enable < 1:
             status = False
@@ -1513,6 +1539,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
             self.modeChange(2)
         else:
             self.modeChange(1)
+        self.toggleDisableProcessing(Qt.CheckState.Unchecked.value)
         self.changeGamma(GUI.gammaSlider.value())
         self.changeCroppingPower(GUI.croppingPowerSlider.value())
         self.toggleKeepSourceResolution(GUI.keepSourceResolutionBox.checkState().value)
@@ -1520,6 +1547,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         self.toggleImageFormatBox(GUI.mozJpegBox.checkState().value)
         self.togglechunkSizeCheckBox(GUI.chunkSizeCheckBox.checkState().value)
         self.togglefileFusionBox(GUI.fileFusionBox.checkState().value)
+        self.toggleDisableProcessing(GUI.disableProcessingBox.checkState().value)
         self.addMessage(f'Loaded device preset: <b>{escape(name)}</b>', 'info')
 
     def saveCurrentDevicePreset(self):
@@ -2213,6 +2241,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                         getattr(GUI, option).setCheckState(Qt.CheckState(self.options[option]))
                 except AttributeError:
                     pass
+        GUI.disableProcessingBox.stateChanged.connect(self.toggleDisableProcessing)
+        self.toggleDisableProcessing(GUI.disableProcessingBox.checkState().value)
         self.worker.sync()
         self.versionCheck.start()
         self.tray.show()
