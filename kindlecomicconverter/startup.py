@@ -26,9 +26,21 @@ from . import __version__
 from .shared import dependencyCheck
 
 
+def loadEnvironment():
+    if getattr(sys, 'frozen', False):
+        environment_files = (
+            Path(sys.executable).parent / '.env',
+            Path(sys._MEIPASS) / '.env',
+        )
+    else:
+        environment_files = (Path(__file__).resolve().parent.parent / '.env',)
+
+    for environment_file in environment_files:
+        load_dotenv(environment_file)
+
+
 def start():
-    application_directory = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent.parent
-    load_dotenv(application_directory / '.env')
+    loadEnvironment()
     dependencyCheck(3)
     from . import KCC_gui
     os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = "1"
