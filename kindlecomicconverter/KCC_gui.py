@@ -728,6 +728,16 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                 GUI.jobList.addItem(fname)
                 GUI.jobList.scrollToBottom()
 
+    def selectInput(self):
+        menu = QMenu(MW)
+        files_action = menu.addAction('Add individual files...')
+        folder_action = menu.addAction('Add folder recursively...')
+        action = menu.exec(GUI.fileButton.mapToGlobal(GUI.fileButton.rect().bottomLeft()))
+        if action == files_action:
+            self.selectFile()
+        elif action == folder_action:
+            self.selectDir()
+
     def selectDir(self):
         dname = QFileDialog.getExistingDirectory(
             MW, 'Select input folder', self.lastPath, QFileDialog.Option.ShowDirsOnly
@@ -1898,7 +1908,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         APP.messageFromOtherInstance.connect(self.handleMessage)
         GUI.defaultOutputFolderButton.clicked.connect(self.selectDefaultOutputFolder)
         GUI.clearButton.clicked.connect(self.clearJobs)
-        GUI.fileButton.clicked.connect(self.selectFile)
+        GUI.fileButton.clicked.connect(self.selectInput)
         GUI.directoryButton.clicked.connect(self.selectDir)
         GUI.jobList.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         GUI.jobList.customContextMenuRequested.connect(self.showJobListContextMenu)

@@ -334,10 +334,10 @@
           </size>
          </property>
          <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p style='white-space:pre'&gt;Add CBR, CBZ, CB7 or PDF file to queue.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>Choose individual comic files or recursively add files from a folder.</string>
          </property>
          <property name="text">
-          <string>Add input file(s)</string>
+          <string>Add input...</string>
          </property>
          <property name="icon">
           <iconset resource="KCC.qrc">
