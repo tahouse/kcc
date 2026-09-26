@@ -21,9 +21,9 @@ from datetime import datetime, timezone
 import itertools
 import json
 from pathlib import Path
-from PySide6.QtCore import (QSize, QUrl, Qt, Signal, QIODeviceBase, QEvent, QThread, QSettings, QTimer)
+from PySide6.QtCore import (QSize, QUrl, Qt, Signal, QIODeviceBase, QEvent, QSignalBlocker, QThread, QSettings, QTimer)
 from PySide6.QtGui import (QColor, QIcon, QImage, QKeyEvent, QKeySequence, QPixmap, QShortcut, QDesktopServices)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QDialogButtonBox, QHBoxLayout, QLabel, QListWidgetItem, QMainWindow, QMenu, QSizePolicy, QSystemTrayIcon, QFileDialog, QMessageBox, QDialog, QAbstractItemView, QListView, QTreeView, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QDialogButtonBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidgetItem, QMainWindow, QMenu, QSizePolicy, QSlider, QSpinBox, QSystemTrayIcon, QFileDialog, QMessageBox, QDialog, QAbstractItemView, QListView, QTreeView, QVBoxLayout, QWidget)
 from PySide6.QtNetwork import (QLocalSocket, QLocalServer)
 
 import os
@@ -1397,6 +1397,14 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         self.croppingPowerValue = value
 
     def changeDevice(self):
+        device_data = GUI.deviceBox.currentData()
+        if device_data == 'save-user-device-preset':
+            GUI.deviceBox.setCurrentIndex(self.activeDeviceIndex)
+            self.saveCurrentDevicePreset()
+            return
+        preset_name = None
+        if isinstance(device_data, str) and device_data.startswith('user-device-preset:'):
+            preset_name = device_data.partition(':')[2]
         profile = GUI.profiles[str(GUI.deviceBox.currentText())]
         if profile['ForceExpert']:
             self.modeChange(3)
@@ -1429,6 +1437,112 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         if str(GUI.deviceBox.currentText()) == 'Other':
             self.addMessage('<a href="https://github.com/ciromattia/kcc/wiki/NonKindle-devices">'
                             'List of supported Non-Kindle devices.</a>', 'info')
+        self.activeDeviceIndex = GUI.deviceBox.currentIndex()
+        if preset_name:
+            self.applyDevicePreset(preset_name)
+
+    def captureDevicePreset(self, base_profile):
+        widgets = {}
+        for widget_type, property_name in (
+                (QCheckBox, 'checkState'), (QSpinBox, 'value'),
+                (QSlider, 'value'), (QLineEdit, 'text')):
+            for widget in GUI.centralWidget.findChildren(widget_type):
+                if not widget.objectName():
+                    continue
+                value = getattr(widget, property_name)()
+                if isinstance(value, Qt.CheckState):
+                    value = value.value
+                widgets[widget.objectName()] = value
+        return {
+            'baseProfile': base_profile,
+            'format': GUI.formatBox.currentIndex(),
+            'defaultOutputFolder': self.defaultOutputFolder,
+            'targetDirectory': self.targetDirectory,
+            'expertMode': self.expertMode,
+            'widgets': widgets,
+        }
+
+    def applyDevicePreset(self, name):
+        preset = self.userDevicePresets.get(name)
+        if not preset:
+            return
+        format_index = int(preset.get('format', GUI.formatBox.currentIndex()))
+        format_index = max(0, min(format_index, GUI.formatBox.count() - 1))
+        self.changeFormat(format_index)
+        self.defaultOutputFolder = str(preset.get('defaultOutputFolder', ''))
+        self.targetDirectory = str(preset.get('targetDirectory', ''))
+        self.expertMode = bool(preset.get('expertMode', self.expertMode))
+        if self.expertMode:
+            self.show_expert_options()
+        else:
+            self.hide_expert_options()
+
+        blockers = []
+        for object_name, value in preset.get('widgets', {}).items():
+            widget = getattr(GUI, object_name, None)
+            if widget is None:
+                continue
+            blockers.append(QSignalBlocker(widget))
+            if isinstance(widget, QCheckBox):
+                widget.setCheckState(Qt.CheckState(int(value)))
+            elif isinstance(widget, (QSpinBox, QSlider)):
+                widget.setValue(int(value))
+            elif isinstance(widget, QLineEdit):
+                widget.setText(str(value))
+        blockers.clear()
+        if self.expertMode:
+            self.modeChange(3)
+        elif GUI.gammaBox.isChecked():
+            self.modeChange(2)
+        else:
+            self.modeChange(1)
+        self.changeGamma(GUI.gammaSlider.value())
+        self.changeCroppingPower(GUI.croppingPowerSlider.value())
+        self.toggleKeepSourceResolution(GUI.keepSourceResolutionBox.checkState().value)
+        self.toggleKeepSpreadsCombined(GUI.keepSpreadsCombinedBox.checkState().value)
+        self.toggleImageFormatBox(GUI.mozJpegBox.checkState().value)
+        self.togglechunkSizeCheckBox(GUI.chunkSizeCheckBox.checkState().value)
+        self.togglefileFusionBox(GUI.fileFusionBox.checkState().value)
+        self.addMessage(f'Loaded device preset: <b>{escape(name)}</b>', 'info')
+
+    def saveCurrentDevicePreset(self):
+        name, accepted = QInputDialog.getText(
+            MW, 'Save device preset', 'Preset name:', text='iPad / Suwayomi'
+        )
+        name = name.strip()
+        if not accepted or not name:
+            return
+        if name in self.builtInProfileNames:
+            QMessageBox.warning(MW, 'KCC - Reserved name', 'Choose a name that is not a built-in device.')
+            return
+        if name in self.userDevicePresets:
+            overwrite = QMessageBox.question(
+                MW, 'KCC - Replace preset', f'Replace the existing preset "{name}"?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if overwrite != QMessageBox.StandardButton.Yes:
+                return
+
+        device_data = GUI.deviceBox.currentData()
+        if isinstance(device_data, str) and device_data.startswith('user-device-preset:'):
+            current_name = device_data.partition(':')[2]
+            base_profile = self.userDevicePresets[current_name]['baseProfile']
+        else:
+            base_profile = str(GUI.deviceBox.currentText())
+        self.userDevicePresets[name] = self.captureDevicePreset(base_profile)
+        self.settings.setValue('userDevicePresets', json.dumps(self.userDevicePresets, sort_keys=True))
+        self.settings.sync()
+
+        preset_data = f'user-device-preset:{name}'
+        index = GUI.deviceBox.findData(preset_data)
+        if index < 0:
+            index = GUI.deviceBox.findData('save-user-device-preset')
+            GUI.deviceBox.insertItem(index, self.icons.deviceOther, name, preset_data)
+        self.profiles[name] = copy(self.profiles[base_profile])
+        GUI.deviceBox.setCurrentIndex(index)
+        self.activeDeviceIndex = index
+        self.addMessage(f'Saved device preset: <b>{escape(name)}</b>', 'info')
 
     def changeFormat(self, outputformat=None):
         profile = GUI.profiles[str(GUI.deviceBox.currentText())]
@@ -1571,6 +1685,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         self.settings.setValue('lastPath', self.lastPath)
         self.settings.setValue('defaultOutputFolder', self.defaultOutputFolder)
         self.settings.setValue('lastDevice', GUI.deviceBox.currentIndex())
+        self.settings.setValue('lastDeviceName', GUI.deviceBox.currentText())
         self.settings.setValue('currentFormat', GUI.formatBox.currentIndex())
         self.settings.setValue('startNumber', self.startNumber + 1)
         self.settings.setValue('startNumber2', self.startNumber2 + 1)
@@ -1688,6 +1803,12 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         self.editor = KCCGUI_MetaEditor()
         self.icons = Icons()
         self.settings = QSettings('ciromattia', 'kcc10')
+        try:
+            self.userDevicePresets = json.loads(self.settings.value('userDevicePresets', '{}', type=str))
+        except (TypeError, json.JSONDecodeError):
+            self.userDevicePresets = {}
+        if not isinstance(self.userDevicePresets, dict):
+            self.userDevicePresets = {}
         self.settingsVersion = self.settings.value('settingsVersion', '', type=str)
         self.lastPath = self.settings.value('lastPath', '', type=str)
         self.defaultOutputFolder = str(self.settings.value('defaultOutputFolder', '', type=str))
@@ -1707,6 +1828,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
 
         # default is Kindle Paperwhite 12th Gen
         self.lastDevice = self.settings.value('lastDevice', 3, type=int)
+        self.lastDeviceName = self.settings.value('lastDeviceName', '', type=str)
 
         self.currentFormat = self.settings.value('currentFormat', 0, type=int)
         self.startNumber = self.settings.value('startNumber', 0, type=int)
@@ -1731,6 +1853,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         self.croppingPowerValue = 1.0
         self.currentMode = 1
         self.targetDirectory = ''
+        self.activeDeviceIndex = 0
         if sys.platform.startswith('win'):
             # noinspection PyUnresolvedReferences
             from psutil import BELOW_NORMAL_PRIORITY_CLASS
@@ -1868,6 +1991,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
             "Other": {'PVOptions': False, 'ForceExpert': True, 'DefaultFormat': 1, 'DefaultUpscale': False, 'ForceColor': False,
                       'Label': 'OTHER'},
         }
+        self.builtInProfileNames = set(self.profiles)
         profilesGUI = [
             "Kindle Scribe Colorsoft",
             "Kindle Scribe 3",
@@ -2016,11 +2140,25 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                 GUI.deviceBox.addItem(self.icons.deviceKobo, profile)
             else:
                 GUI.deviceBox.addItem(self.icons.deviceKindle, profile)
+        GUI.deviceBox.insertSeparator(GUI.deviceBox.count())
+        for name, preset in sorted(self.userDevicePresets.items()):
+            base_profile = preset.get('baseProfile', 'Other')
+            if name in self.builtInProfileNames or base_profile not in self.profiles:
+                continue
+            self.profiles[name] = copy(self.profiles[base_profile])
+            GUI.deviceBox.addItem(self.icons.deviceOther, name, f'user-device-preset:{name}')
+        GUI.deviceBox.insertSeparator(GUI.deviceBox.count())
+        GUI.deviceBox.addItem(self.icons.deviceOther, 'Save current settings as new device...',
+                              'save-user-device-preset')
         for f in self.formats:
             GUI.formatBox.addItem(getattr(self.icons, self.formats[f]['icon'] + 'Format'), f)
-        if self.lastDevice > GUI.deviceBox.count():
+        if self.lastDevice >= GUI.deviceBox.count():
             self.lastDevice = 0
-        if profilesGUI[self.lastDevice] == "Separator":
+        named_device_index = GUI.deviceBox.findText(self.lastDeviceName)
+        if named_device_index >= 0 and GUI.deviceBox.itemData(named_device_index) != 'save-user-device-preset':
+            self.lastDevice = named_device_index
+        model_item = GUI.deviceBox.model().item(self.lastDevice)
+        if model_item is None or not model_item.isEnabled() or GUI.deviceBox.itemData(self.lastDevice) == 'save-user-device-preset':
             self.lastDevice = 0
         if self.currentFormat > GUI.formatBox.count():
             self.currentFormat = 0
