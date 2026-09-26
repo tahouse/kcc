@@ -39,7 +39,7 @@ class Ui_mainWindow(object):
         self.jobList.setObjectName(u"jobList")
         self.jobList.setMinimumSize(QSize(0, 90))
         self.jobList.setStyleSheet(u"")
-        self.jobList.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.jobList.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.jobList.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.jobList.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
@@ -141,6 +141,11 @@ class Ui_mainWindow(object):
         self.heightBox.setMaximum(8000)
 
         self.gridLayout_3.addWidget(self.heightBox, 0, 3, 1, 1)
+
+        self.keepSourceResolutionBox = QCheckBox(self.customWidget)
+        self.keepSourceResolutionBox.setObjectName(u"keepSourceResolutionBox")
+
+        self.gridLayout_3.addWidget(self.keepSourceResolutionBox, 0, 4, 1, 1)
 
 
         self.gridLayout.addWidget(self.customWidget, 8, 0, 1, 2)
@@ -489,6 +494,16 @@ class Ui_mainWindow(object):
 
         self.gridLayout_2.addWidget(self.onePageLandscapeBox, 11, 1, 1, 1)
 
+        self.outputSubfolderBox = QCheckBox(self.optionWidget)
+        self.outputSubfolderBox.setObjectName(u"outputSubfolderBox")
+
+        self.gridLayout_2.addWidget(self.outputSubfolderBox, 11, 2, 1, 1)
+
+        self.keepSpreadsCombinedBox = QCheckBox(self.optionWidget)
+        self.keepSpreadsCombinedBox.setObjectName(u"keepSpreadsCombinedBox")
+
+        self.gridLayout_2.addWidget(self.keepSpreadsCombinedBox, 11, 3, 1, 1)
+
         self.keepComicInfoBox = QCheckBox(self.optionWidget)
         self.keepComicInfoBox.setObjectName(u"keepComicInfoBox")
 
@@ -665,7 +680,7 @@ class Ui_mainWindow(object):
     def retranslateUi(self, mainWindow):
         mainWindow.setWindowTitle(QCoreApplication.translate("mainWindow", u"Kindle Comic Converter", None))
 #if QT_CONFIG(tooltip)
-        self.jobList.setToolTip(QCoreApplication.translate("mainWindow", u"<html><head/><body><p>Double click on source to open it in metadata editor.</p></body></html>", None))
+        self.jobList.setToolTip(QCoreApplication.translate("mainWindow", u"<html><head/><body><p>Double click a source to edit metadata. Select sources and press Delete or Backspace, or right-click, to remove them.</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
 #if QT_CONFIG(tooltip)
         self.preserveMarginLabel.setToolTip(QCoreApplication.translate("mainWindow", u"<html><head/><body><p>After calculating the cropping boundaries, &quot;back up&quot; a specified percentage amount.</p></body></html>", None))
@@ -688,9 +703,13 @@ class Ui_mainWindow(object):
         self.heightBox.setToolTip(QCoreApplication.translate("mainWindow", u"<html><head/><body><p style='white-space:pre'>Resolution of the target device.</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
 #if QT_CONFIG(tooltip)
-        self.directoryButton.setToolTip(QCoreApplication.translate("mainWindow", u"<html><head/><body><p style='white-space:pre'>Add directory containing JPG, PNG or GIF files to queue.<br/><span style=\" font-weight:600;\">CBR, CBZ and CB7 files inside will not be processed!</span></p></body></html>", None))
+        self.keepSourceResolutionBox.setToolTip(QCoreApplication.translate("mainWindow", u"Keep each source image's resolution instead of resizing it to the selected device profile. Other enabled image processing still applies.", None))
 #endif // QT_CONFIG(tooltip)
-        self.directoryButton.setText(QCoreApplication.translate("mainWindow", u"Add input folder(s)", None))
+        self.keepSourceResolutionBox.setText(QCoreApplication.translate("mainWindow", u"Keep source resolution", None))
+#if QT_CONFIG(tooltip)
+        self.directoryButton.setToolTip(QCoreApplication.translate("mainWindow", u"Recursively add selected file types from one or more folders.", None))
+#endif // QT_CONFIG(tooltip)
+        self.directoryButton.setText(QCoreApplication.translate("mainWindow", u"Add folder recursively", None))
 #if QT_CONFIG(tooltip)
         self.formatBox.setToolTip(QCoreApplication.translate("mainWindow", u"<html><head/><body><p style='white-space:pre'>Output format.</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
@@ -909,6 +928,14 @@ class Ui_mainWindow(object):
         self.onePageLandscapeBox.setToolTip(QCoreApplication.translate("mainWindow", u"<html><head/><body><p><span style=\" font-weight:600; text-decoration: underline;\">Unchecked - 2 page landscape<br/></span>2 viewports for left and right pages</p><p><span style=\" font-weight:600; text-decoration: underline;\">Checked - 1 page landscape<br/></span>A single centered viewport for 1 page</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
         self.onePageLandscapeBox.setText(QCoreApplication.translate("mainWindow", u"1 Page Landscape", None))
+#if QT_CONFIG(tooltip)
+        self.outputSubfolderBox.setToolTip(QCoreApplication.translate("mainWindow", u"Create one subfolder per input book inside the output directory. Batch conversions use a separate folder for each source.", None))
+#endif // QT_CONFIG(tooltip)
+        self.outputSubfolderBox.setText(QCoreApplication.translate("mainWindow", u"Subfolder per input", None))
+#if QT_CONFIG(tooltip)
+        self.keepSpreadsCombinedBox.setToolTip(QCoreApplication.translate("mainWindow", u"Keep detected and labeled spreads as one landscape image without splitting or rotating them. Overrides Spread splitter and No rotate.", None))
+#endif // QT_CONFIG(tooltip)
+        self.keepSpreadsCombinedBox.setText(QCoreApplication.translate("mainWindow", u"Keep spreads combined", None))
 #if QT_CONFIG(tooltip)
         self.keepComicInfoBox.setToolTip(QCoreApplication.translate("mainWindow", u"Keep any original ComicInfo.xml files.\n"
 "\n"

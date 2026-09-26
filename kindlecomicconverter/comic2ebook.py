@@ -1013,6 +1013,7 @@ def getWorkFolder(afile, options, workdir=None):
                     for manifest_item in opf.findall(".//*[@media-type='application/xhtml+xml']"):
                         manifest_dict[manifest_item.attrib.get('id')] = manifest_item.attrib.get('href')
                     ordered_image_paths = []
+                    seen_image_paths = set()
                     for i, spine_item in enumerate(spine):
                         try:
                             page_path = os.path.join(os.path.dirname(opf_path), manifest_dict[spine_item])
@@ -1021,26 +1022,19 @@ def getWorkFolder(afile, options, workdir=None):
                             continue
                         imgs = page.findall(r'.//{*}img') + page.findall(r'.//{*}image')
 
-                        largest_size = 0
-                        img_path = None
                         for img in imgs:
                             for key in img.attrib:
                                 if 'src' in key or 'href' in key:
                                     temp_img_path = img.attrib[key]
-                                    if temp_img_path.startswith('..'):
-                                        temp_img_path = os.path.join(os.path.dirname(opf_path), os.path.dirname(manifest_dict[spine_item]), temp_img_path)
-                                    else:
-                                        temp_img_path = os.path.join(os.path.dirname(opf_path), os.path.dirname(manifest_dict[spine_item]), temp_img_path)
-                                    try:
-                                        temp_size = os.path.getsize(temp_img_path)
-                                        if temp_size > largest_size:
-                                            largest_size = temp_size
-                                            img_path = temp_img_path
-                                    except OSError:
-                                        pass
-                        # TODO empty image
-                        if img_path:
-                            ordered_image_paths.append(img_path)
+                                    temp_img_path = os.path.normpath(os.path.join(
+                                        os.path.dirname(opf_path),
+                                        os.path.dirname(manifest_dict[spine_item]),
+                                        temp_img_path
+                                    ))
+                                    if os.path.isfile(temp_img_path) and temp_img_path not in seen_image_paths:
+                                        ordered_image_paths.append(temp_img_path)
+                                        seen_image_paths.add(temp_img_path)
+                                        break
                     # fallback if naive spine extraction fails
                     if not ordered_image_paths:
                         return workdir
@@ -1102,6 +1096,12 @@ def getOutputFilename(srcpath, wantedname, ext, tomenumber):
             filename = source_path.with_name(name)
         else:
             filename = os.path.splitext(srcpath)[0] + tomenumber + ext
+    if options.output_subfolder and not (wantedname is not None and wantedname.endswith(ext)):
+        output_root = os.path.abspath(wantedname) if wantedname is not None else str(source_path.parent.resolve())
+        source_name = source_path.stem if source_path.is_file() else source_path.name
+        output_directory = os.path.join(output_root, source_name)
+        os.makedirs(output_directory, exist_ok=True)
+        filename = os.path.join(output_directory, source_name + tomenumber + ext)
     if os.path.exists(filename):
         counter = 0
         basename = os.path.splitext(filename)[0]
@@ -1509,6 +1509,8 @@ def makeParser():
 
     output_options.add_argument("-o", "--output", action="store", dest="output", default=None,
                                 help="Output generated file to specified directory or file")
+    output_options.add_argument("--output-subfolder", action="store_true", dest="output_subfolder", default=False,
+                                help="Create one subfolder per source book inside the output directory")
     output_options.add_argument("-t", "--title", action="store", dest="title", default="defaulttitle",
                                 help="Comic title [Default=filename or directory name]")
     output_options.add_argument("--metadatatitle", type=int, dest="metadatatitle", default=0,
@@ -1553,8 +1555,12 @@ def makeParser():
                                     help="Resize images smaller than device's resolution")
     processing_options.add_argument("-s", "--stretch", action="store_true", dest="stretch", default=False,
                                     help="Stretch images to device's resolution")
+    processing_options.add_argument("--keep-source-resolution", action="store_true", dest="keep_source_resolution",
+                                    default=False, help="Keep each source image's resolution")
     processing_options.add_argument("-r", "--splitter", type=int, dest="splitter", default="0",
                                     help="Double page parsing mode. 0: Split 1: Rotate 2: Both [Default=0]")
+    processing_options.add_argument("--keep-spreads-combined", action="store_true", dest="keep_spreads_combined",
+                                    default=False, help="Keep spreads combined without splitting or rotating")
     processing_options.add_argument("-g", "--gamma", type=float, dest="gamma", default="0.0",
                                     help="Apply gamma correction to linearize the image [Default=Auto]")
     output_options.add_argument("--autolevel", action="store_true", dest="autolevel", default=False,
@@ -1621,6 +1627,9 @@ def checkOptions(options):
     options.isKobo = False
     options.bordersColor = None
     options.keep_epub = False
+    if options.keep_spreads_combined:
+        options.splitter = 1
+        options.norotate = True
 
     if options.profile in image.ProfileData.ProfilesKindle.keys():
         options.iskindle = True

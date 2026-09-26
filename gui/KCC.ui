@@ -31,13 +31,13 @@
        </size>
       </property>
       <property name="toolTip">
-       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Double click on source to open it in metadata editor.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Double click a source to edit metadata. Select sources and press Delete or Backspace, or right-click, to remove them.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
       </property>
       <property name="styleSheet">
        <string notr="true"/>
       </property>
       <property name="selectionMode">
-       <enum>QAbstractItemView::SelectionMode::NoSelection</enum>
+        <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
       </property>
       <property name="verticalScrollMode">
        <enum>QAbstractItemView::ScrollMode::ScrollPerPixel</enum>
@@ -228,6 +228,16 @@
          </property>
         </widget>
        </item>
+       <item row="0" column="4">
+        <widget class="QCheckBox" name="keepSourceResolutionBox">
+         <property name="toolTip">
+          <string>Keep each source image's resolution instead of resizing it to the selected device profile. Other enabled image processing still applies.</string>
+         </property>
+         <property name="text">
+          <string>Keep source resolution</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>
@@ -261,10 +271,10 @@
           </sizepolicy>
          </property>
          <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p style='white-space:pre'&gt;Add directory containing JPG, PNG or GIF files to queue.&lt;br/&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;CBR, CBZ and CB7 files inside will not be processed!&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>Recursively add selected file types from one or more folders.</string>
          </property>
          <property name="text">
-          <string>Add input folder(s)</string>
+          <string>Add folder recursively</string>
          </property>
          <property name="icon">
           <iconset resource="KCC.qrc">
@@ -963,6 +973,26 @@ May crop top/bottom or left/right depending on source aspect ratio. Not implemen
          </property>
          <property name="text">
           <string>1 Page Landscape</string>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="2">
+        <widget class="QCheckBox" name="outputSubfolderBox">
+         <property name="toolTip">
+          <string>Create one subfolder per input book inside the output directory. Batch conversions use a separate folder for each source.</string>
+         </property>
+         <property name="text">
+          <string>Subfolder per input</string>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="3">
+        <widget class="QCheckBox" name="keepSpreadsCombinedBox">
+         <property name="toolTip">
+          <string>Keep detected and labeled spreads as one landscape image without splitting or rotating them. Overrides Spread splitter and No rotate.</string>
+         </property>
+         <property name="text">
+          <string>Keep spreads combined</string>
          </property>
         </widget>
        </item>

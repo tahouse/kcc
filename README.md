@@ -298,6 +298,8 @@ PROCESSING:
   --wallpaper           Crop images to to fill screen
   -r SPLITTER, --splitter SPLITTER
                         Double page parsing mode. 0: Split 1: Rotate 2: Both [Default=0]
+  --keep-spreads-combined
+                        Keep spreads combined without splitting or rotating
   -g GAMMA, --gamma GAMMA
                         Apply gamma correction to linearize the image [Default=Auto]
   --autolevel           Set most common dark pixel value to be black point for leveling.
@@ -331,6 +333,7 @@ PROCESSING:
 OUTPUT SETTINGS:
   -o OUTPUT, --output OUTPUT
                         Output generated file to specified directory or file
+  --output-subfolder    Create one subfolder per source book inside the output directory
   -t TITLE, --title TITLE
                         Comic title [Default=filename or directory name]
   --metadatatitle       Write title using ComicInfo.xml or other embedded metadata. 0: Don't use Title from metadata 1: Combine Title with default schema 2: Use Title only [Default=0]

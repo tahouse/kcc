@@ -558,6 +558,8 @@ class ComicPage:
             self.image = erase_rainbow_artifacts(self.image, is_color)
 
     def resizeImage(self):
+        if self.opt.keep_source_resolution:
+            return
         if self.opt.wallpaper:
             pass
         elif self.opt.norotate and self.targetPathOrder in ('-kcc-a', '-kcc-d') and not self.opt.kindle_scribe_azw3:
@@ -622,6 +624,8 @@ class Cover:
             self.image = self.image.convert('L')
         if self.options.smartcovercrop:
             self.crop_main_cover()
+        if self.options.keep_source_resolution:
+            return
 
         size = list(self.options.profileData[1])
         if self.options.kindle_scribe_azw3:

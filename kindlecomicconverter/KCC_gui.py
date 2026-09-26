@@ -21,9 +21,9 @@ from datetime import datetime, timezone
 import itertools
 import json
 from pathlib import Path
-from PySide6.QtCore import (QSize, QUrl, Qt, Signal, QIODeviceBase, QEvent, QThread, QSettings)
-from PySide6.QtGui import (QColor, QIcon, QImage, QKeyEvent, QPixmap, QDesktopServices)
-from PySide6.QtWidgets import (QApplication, QDialogButtonBox, QHBoxLayout, QLabel, QListWidgetItem, QMainWindow, QSizePolicy, QSystemTrayIcon, QFileDialog, QMessageBox, QDialog, QAbstractItemView, QListView, QTreeView, QWidget)
+from PySide6.QtCore import (QSize, QUrl, Qt, Signal, QIODeviceBase, QEvent, QThread, QSettings, QTimer)
+from PySide6.QtGui import (QColor, QIcon, QImage, QKeyEvent, QKeySequence, QPixmap, QShortcut, QDesktopServices)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QDialogButtonBox, QHBoxLayout, QLabel, QListWidgetItem, QMainWindow, QMenu, QSizePolicy, QSystemTrayIcon, QFileDialog, QMessageBox, QDialog, QAbstractItemView, QListView, QTreeView, QVBoxLayout, QWidget)
 from PySide6.QtNetwork import (QLocalSocket, QLocalServer)
 
 import os
@@ -156,6 +156,50 @@ class Icons:
         self.fanatical.addPixmap(QPixmap(":/Brand/icons/fanatical.png"), QIcon.Mode.Normal, QIcon.State.Off)
 
 
+class SpreadLabelJobStatus(QWidget):
+    def __init__(self, path):
+        super().__init__()
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(4, 0, 4, 0)
+        self.marker = QLabel()
+        self.marker.setFixedWidth(18)
+        self.marker.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.marker)
+        layout.addWidget(QLabel(path))
+        layout.addStretch()
+        self.frames = ('\u25f4', '\u25f7', '\u25f6', '\u25f5')
+        self.frame = 0
+        self.timer = QTimer(self)
+        self.timer.setInterval(120)
+        self.timer.timeout.connect(self.advance)
+
+    def advance(self):
+        self.marker.setText(self.frames[self.frame])
+        self.frame = (self.frame + 1) % len(self.frames)
+
+    def setPending(self):
+        self.timer.stop()
+        self.frame = 0
+        self.marker.clear()
+
+    def setActive(self):
+        self.setPending()
+        self.marker.setStyleSheet('color: palette(highlight); font-size: 16px;')
+        self.advance()
+        self.timer.start()
+
+    def setComplete(self):
+        self.timer.stop()
+        self.marker.setStyleSheet('color: #218739; font-size: 16px; font-weight: bold;')
+        self.marker.setText('\u2713')
+
+    def setCanceled(self):
+        self.timer.stop()
+        self.marker.setStyleSheet('color: palette(mid); font-size: 16px;')
+        self.marker.setText('\u2014')
+
+
 class VersionThread(QThread):
     def __init__(self, startNumber2):
         QThread.__init__(self)
@@ -285,6 +329,8 @@ def get_options():
         options.stretch = True
     elif GUI.upscaleBox.checkState() == Qt.CheckState.Checked:
         options.upscale = True
+    if GUI.keepSourceResolutionBox.isChecked():
+        options.keep_source_resolution = True
     if GUI.gammaBox.isChecked() and float(GUI.gammaValue) > 0.09:
         options.gamma = float(GUI.gammaValue)
     if GUI.autoLevelBox.isChecked():
@@ -352,6 +398,9 @@ def get_options():
         options.filefusion = False
     if GUI.noRotateBox.isChecked():
         options.norotate = True
+    if GUI.keepSpreadsCombinedBox.isChecked():
+        options.splitter = 1
+        options.norotate = True
     if GUI.rotateRightBox.isChecked():
         options.rotateright = True
     if GUI.rotateFirstBox.isChecked():
@@ -370,11 +419,13 @@ def get_options():
         options.noquantize = True
     if GUI.jpegQualityBox.isChecked():
         options.jpegquality = GUI.jpegQualitySpinBox.value()
-    if GUI.currentMode > 2:
+    if GUI.currentMode > 2 and not GUI.keepSourceResolutionBox.isChecked():
         options.customwidth = str(GUI.widthBox.value())
         options.customheight = str(GUI.heightBox.value())
     if GUI.targetDirectory != '':
         options.output = GUI.targetDirectory
+    if GUI.outputSubfolderBox.isChecked():
+        options.output_subfolder = True
     if GUI.titleEdit.text():
         options.title = str(GUI.titleEdit.text())
     if GUI.authorEdit.text():
@@ -553,7 +604,8 @@ class WorkerThread(QThread):
                             for item in outputPath:
                                 GUI.progress.content = ''
                                 mobiPath = item.replace('.epub', '.mobi')
-                                if GUI.targetDirectory and GUI.targetDirectory != os.path.dirname(mobiPath):
+                                if (GUI.targetDirectory and not options.output_subfolder
+                                        and GUI.targetDirectory != os.path.dirname(mobiPath)):
                                     try:
                                         move(mobiPath, GUI.targetDirectory)
                                     except Exception:
@@ -594,7 +646,8 @@ class WorkerThread(QThread):
                                                False)
                 else:
                     for item in outputPath:
-                        if GUI.targetDirectory and GUI.targetDirectory != os.path.dirname(item):
+                        if (GUI.targetDirectory and not options.output_subfolder
+                                and GUI.targetDirectory != os.path.dirname(item)):
                             try:
                                 move(item, GUI.targetDirectory)
                             except Exception:
@@ -635,7 +688,10 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         if dname != '':
             if sys.platform.startswith('win'):
                 dname = dname.replace('/', '\\')
-            GUI.defaultOutputFolder = dname
+            self.defaultOutputFolder = dname
+            self.targetDirectory = dname
+            GUI.defaultOutputFolderBox.setCheckState(Qt.CheckState.Checked)
+        return self.defaultOutputFolder
 
     def is_directory_on_kindle(self, dname):
         path = Path(dname)
@@ -673,10 +729,6 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                 GUI.jobList.scrollToBottom()
 
     def selectDir(self):
-        if self.needClean:
-            self.needClean = False
-            GUI.jobList.clear()
- 
         dialog = QFileDialog(MW, 'Select input folder(s)', self.lastPath)
         dialog.setFileMode(QFileDialog.FileMode.Directory)
         dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
@@ -685,24 +737,149 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
 
         if dialog.exec():
             dnames = dialog.selectedFiles()
+            extensions = self.selectRecursiveInputTypes()
+            if not extensions:
+                return
             for dname in dnames:
-                if dname != '':
+                if dname:
                     self.lastPath = os.path.abspath(os.path.join(dname, os.pardir))
-                    GUI.jobList.addItem(dname)
-                    GUI.jobList.scrollToBottom()
+            files = self.findRecursiveInputFiles(dnames, extensions)
+            if self.needClean:
+                self.needClean = False
+                GUI.jobList.clear()
+            queued = {
+                os.path.normcase(os.path.abspath(GUI.jobList.item(i).text()))
+                for i in range(GUI.jobList.count())
+                if GUI.jobList.item(i).icon().isNull()
+            }
+            added = 0
+            for filename in files:
+                normalized = os.path.normcase(os.path.abspath(filename))
+                if normalized not in queued:
+                    GUI.jobList.addItem(filename)
+                    queued.add(normalized)
+                    added += 1
+            if added:
+                GUI.jobList.scrollToBottom()
+            else:
+                self.addMessage('No new matching input files found in the selected folder(s).', 'warning')
+
+    def findRecursiveInputFiles(self, directories, extensions):
+        files = []
+        for directory in directories:
+            for root, _, filenames in os.walk(directory):
+                files.extend(
+                    os.path.join(root, filename)
+                    for filename in filenames
+                    if Path(filename).suffix.lower() in extensions
+                )
+        return sorted(files, key=OS_SORT_KEY)
+
+    def selectRecursiveInputTypes(self):
+        input_types = [('CBZ', '.cbz'), ('CBR', '.cbr'), ('CB7', '.cb7'), ('ZIP', '.zip'),
+                       ('RAR', '.rar'), ('7Z', '.7z'), ('EPUB', '.epub'), ('PDF', '.pdf')]
+        if not self.tar and not self.sevenzip:
+            input_types = [('PDF', '.pdf')]
+        defaults = [extension for _, extension in input_types]
+        selected = self.settings.value('recursiveInputTypes', defaults)
+        if isinstance(selected, str):
+            selected = [selected]
+
+        dialog = QDialog(MW)
+        dialog.setWindowTitle('Recursive input file types')
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel('Add these file types from the selected folder(s):'))
+        checkboxes = []
+        for label, extension in input_types:
+            checkbox = QCheckBox(f'{label} (*{extension})')
+            checkbox.setChecked(extension in selected)
+            layout.addWidget(checkbox)
+            checkboxes.append((checkbox, extension))
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        selected = {extension for checkbox, extension in checkboxes if checkbox.isChecked()}
+        if not selected:
+            QMessageBox.warning(MW, 'KCC - No file types', 'Select at least one input file type.')
+            return None
+        self.settings.setValue('recursiveInputTypes', sorted(selected))
+        return selected
+
+    def removeSelectedJobs(self):
+        selected = [item for item in GUI.jobList.selectedItems() if item.icon().isNull()]
+        for item in selected:
+            GUI.jobList.takeItem(GUI.jobList.row(item))
+        has_jobs = any(
+            GUI.jobList.item(i).icon().isNull()
+            for i in range(GUI.jobList.count())
+        )
+        if not has_jobs:
+            for i in range(GUI.jobList.count() - 1, -1, -1):
+                if GUI.jobList.item(i).data(Qt.ItemDataRole.UserRole) == 'spread-label-header':
+                    GUI.jobList.takeItem(i)
+
+    def showJobListContextMenu(self, position):
+        item = GUI.jobList.itemAt(position)
+        if item is None or not item.icon().isNull():
+            return
+        if not item.isSelected():
+            GUI.jobList.clearSelection()
+            item.setSelected(True)
+        menu = QMenu(GUI.jobList)
+        remove_action = menu.addAction('Remove selected')
+        remove_action.triggered.connect(self.removeSelectedJobs)
+        menu.exec(GUI.jobList.viewport().mapToGlobal(position))
 
     def labelSpreadsStart(self):
         low_quality_preview = False
         if QApplication.keyboardModifiers() == Qt.ShiftModifier:
             low_quality_preview = True
         currentJobs = []
+        status_header = None
         # TODO: make this a function since it's copy pasted
         for i in range(GUI.jobList.count()):
+            if GUI.jobList.item(i).data(Qt.ItemDataRole.UserRole) == 'spread-label-header':
+                status_header = GUI.jobList.item(i)
             # Make sure that we don't consider any system message as job to do
             if GUI.jobList.item(i).icon().isNull():
-                currentJobs.append(str(GUI.jobList.item(i).text()))
-        for job in currentJobs:
+                item = GUI.jobList.item(i)
+                currentJobs.append((str(item.text()), item))
+        if currentJobs and status_header is None:
+            status_header = QListWidgetItem(
+                self.icons.info,
+                'Label Spreads  |  \u2713 Complete  |  \u25f4 In progress'
+            )
+            status_header.setData(Qt.ItemDataRole.UserRole, 'spread-label-header')
+            status_header.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            header_font = status_header.font()
+            header_font.setBold(True)
+            status_header.setFont(header_font)
+            GUI.jobList.insertItem(GUI.jobList.row(currentJobs[0][1]), status_header)
+        statuses = {}
+        for job, item in currentJobs:
+            status = GUI.jobList.itemWidget(item)
+            if isinstance(status, SpreadLabelJobStatus):
+                status.setPending()
+            else:
+                if status is not None:
+                    status.hide()
+                    GUI.jobList.removeItemWidget(item)
+                    status.deleteLater()
+                status = SpreadLabelJobStatus(job)
+                GUI.jobList.setItemWidget(item, status)
+            statuses[job] = status
+            item.setForeground(QColor('transparent'))
+            item.setSizeHint(status.sizeHint())
+        for job, item in currentJobs:
+            statuses[job].setActive()
+            GUI.jobList.scrollToItem(item)
+            APP.processEvents()
             images = []
+            match_scores = {}
+            preview_guides = {}
             spreads = []
             options, _ = get_options()
             options.profileData = [(600, 800), (600,800)]
@@ -710,6 +887,14 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
             removeNonImages(path)
             sanitizeTree(path, options)
             flattenTree(path)
+            image_count = sum(len(files) for _, _, files in os.walk(path))
+            if job.lower().endswith('.epub') and image_count < 2 and not options.legacyextract:
+                rmtree(path, True)
+                options.legacyextract = True
+                path = getWorkFolder(job, options)
+                removeNonImages(path)
+                sanitizeTree(path, options)
+                flattenTree(path)
 
             if options.tempdir:
                 workdir = mkdtemp('', 'KCC-', os.path.dirname(job))
@@ -723,9 +908,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                     start_index = 1
                 if options.spreadshift:
                     start_index = 0 if start_index == 1 else 1
-                for i in range(start_index, len(files), 2):
-                    if i  == len(files) - 1:
-                        continue 
+                for i in range(0, len(files) - 1):
                     # TODO: with statements
                     # TODO: ignore 1% of top and bottom too?
                     im1 = Image.open(os.path.join(root, files[i]))
@@ -735,14 +918,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                     size1 = im1.size
                     size2 = im2.size
 
-                    preview_crop1 = im1.crop((0, 0, 0.2*size1[0], size1[1]))
-                    if low_quality_preview:
-                        preview_crop1 = preview_crop1.convert('1', dither=Dither.NONE)
                     calculation_crop1 = im1.crop((0.01*size1[0], 0, 0.04*size1[0], size1[1])).convert('1', dither=Dither.NONE)
 
-                    preview_crop2 = im2.crop((0.8*size2[0], 0, size2[0], size2[1]))
-                    if low_quality_preview:
-                        preview_crop2 = preview_crop2.convert('1', dither=Dither.NONE)
                     calculation_crop2 = im2.crop((0.96*size2[0], 0, .99* size2[0], size2[1])).convert('1', dither=Dither.NONE)
 
                     # dst = Image.new('1', (im1.width + im2.width, im1.height))
@@ -750,26 +927,63 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                     # dst.paste(im1, (im1.width, 0))
                     hist1 = calculation_crop1.histogram()
                     hist2 = calculation_crop2.histogram()
-                    # TODO: small percentage instead of zero
-                    if hist1[0] == 0 or hist1[-1] == 0 or hist2[0] == 0 or hist2[-1] == 0:
-                        continue
+                    totals = (sum(hist1), sum(hist2))
+                    match_score = 100 * min(
+                        hist1[0] / totals[0], hist1[-1] / totals[0],
+                        hist2[0] / totals[1], hist2[-1] / totals[1]
+                    )
 
                     preview_mode = '1' if low_quality_preview else 'RGB'
-                    dst = Image.new(preview_mode, (preview_crop1.width + preview_crop2.width, preview_crop1.height))
+                    if low_quality_preview:
+                        im1 = im1.convert('1', dither=Dither.NONE)
+                        im2 = im2.convert('1', dither=Dither.NONE)
+                    preview_height = int(APP.primaryScreen().availableGeometry().height() * 0.8)
+                    im1.thumbnail((im1.width, preview_height))
+                    im2.thumbnail((im2.width, preview_height))
+                    dst = Image.new(preview_mode, (im1.width + im2.width, max(im1.height, im2.height)))
 
-                    dst.paste(preview_crop2, (0, 0))
-                    dst.paste(preview_crop1, (preview_crop1.width, 0))
-                    dst.save(os.path.join(workdir, f'label-{i:04}.png'))
-                    images.append(os.path.join(workdir, f'label-{i:04}.png'))
+                    dst.paste(im2, (0, 0))
+                    dst.paste(im1, (im2.width, 0))
+                    image_path = os.path.join(workdir, f'label-{i:04}.png')
+                    dst.save(image_path)
+                    images.append(image_path)
+                    match_scores[os.path.basename(image_path)] = match_score
+                    preview_guides[os.path.basename(image_path)] = {
+                        'split': im2.width,
+                        'left_match': (
+                            im2.width - int(0.04 * im2.width),
+                            im2.width - int(0.01 * im2.width)
+                        ),
+                        'right_match': (
+                            im2.width + int(0.01 * im1.width),
+                            im2.width + int(0.04 * im1.width)
+                        )
+                    }
+                    APP.processEvents()
 
                 if images:
-                    dlg = LabelSpreadsDialog(APP.primaryScreen().availableGeometry().height(), images, spreads)
+                    dlg = LabelSpreadsDialog(
+                        APP.primaryScreen().availableGeometry().height(), images, spreads,
+                        match_scores, preview_guides, start_index,
+                        self.spreadLabelPreviewPercent, self.spreadLabelMatchThreshold
+                    )
                     dlg.setWindowTitle(job)
-                    if dlg.exec() == 1:
+                    accepted = dlg.exec() == 1
+                    self.spreadLabelPreviewPercent = dlg.preview_slider.value()
+                    self.spreadLabelMatchThreshold = dlg.threshold_slider.value()
+                    self.settings.setValue('spreadLabelPreviewPercent', self.spreadLabelPreviewPercent)
+                    self.settings.setValue('spreadLabelMatchThreshold', self.spreadLabelMatchThreshold)
+                    if accepted:
                         with open(job+'.json', "w") as fp:
                             # TODO: not very clean to grab index from filename
                             spreads = [int(filename[6:10]) for filename in spreads]
                             json.dump({'spreads': sorted(set(spreads))} , fp) 
+                        statuses[job].setComplete()
+                    else:
+                        statuses[job].setCanceled()
+                else:
+                    self.addMessage(f'No page pairs found in {job}.', 'warning')
+                    statuses[job].setCanceled()
                 rmtree(path, True)
                 rmtree(workdir, True)
 
@@ -943,6 +1157,18 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
             self.currentMode = 3
             GUI.gammaWidget.setVisible(True)
             GUI.customWidget.setVisible(True)
+
+    def toggleKeepSourceResolution(self, state):
+        manual_resolution = state == Qt.CheckState.Unchecked.value
+        GUI.wLabel.setEnabled(manual_resolution)
+        GUI.widthBox.setEnabled(manual_resolution)
+        GUI.hLabel.setEnabled(manual_resolution)
+        GUI.heightBox.setEnabled(manual_resolution)
+
+    def toggleKeepSpreadsCombined(self, state):
+        custom_spread_mode = state == Qt.CheckState.Unchecked.value
+        GUI.rotateBox.setEnabled(custom_spread_mode)
+        GUI.noRotateBox.setEnabled(custom_spread_mode)
 
     def modeConvert(self, enable):
         if enable < 1:
@@ -1208,6 +1434,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
 
     def showDialog(self, message, kind):
         if kind == 'error':
+            print(message, file=sys.stderr, flush=True)
             QMessageBox.critical(MW, 'KCC - Error', message, QMessageBox.StandardButton.Ok)
         elif kind == 'question':
             GUI.versionCheck.setAnswer(QMessageBox.question(MW, 'KCC - Question', message,
@@ -1240,6 +1467,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                 if not self.selectOutputFolder():
                     return
             elif GUI.defaultOutputFolderBox.isChecked():
+                if not self.defaultOutputFolder and not self.selectDefaultOutputFolder():
+                    return
                 self.targetDirectory = self.defaultOutputFolder
             else:
                 GUI.targetDirectory = ''
@@ -1257,7 +1486,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                 if not target_path.exists():
                     target_path.mkdir()
                 self.targetDirectory = str(target_path)
-            if self.currentMode > 2 and (GUI.widthBox.value() == 0 or GUI.heightBox.value() == 0):
+            if (self.currentMode > 2 and not GUI.keepSourceResolutionBox.isChecked()
+                    and (GUI.widthBox.value() == 0 or GUI.heightBox.value() == 0)):
                 GUI.jobList.clear()
                 self.addMessage('Target resolution is not set!', 'error')
                 self.needClean = True
@@ -1313,6 +1543,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                                            'preserveMarginBox': self.preserveMarginBox.value(),
                                            'interPanelCropBox': GUI.interPanelCropBox.checkState(),
                                            'upscaleBox': GUI.upscaleBox.checkState(),
+                                           'keepSourceResolutionBox': GUI.keepSourceResolutionBox.checkState(),
                                            'borderBox': GUI.borderBox.checkState(),
                                            'webtoonBox': GUI.webtoonBox.checkState(),
                                            'outputSplit': GUI.outputSplit.checkState(),
@@ -1340,6 +1571,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                                            'onePageLandscapeBox': GUI.onePageLandscapeBox.checkState(),
                                            'fileFusionBox': GUI.fileFusionBox.checkState(),
                                            'defaultOutputFolderBox': GUI.defaultOutputFolderBox.checkState(),
+                                           'outputSubfolderBox': GUI.outputSubfolderBox.checkState(),
+                                           'keepSpreadsCombinedBox': GUI.keepSpreadsCombinedBox.checkState(),
                                            'noRotateBox': GUI.noRotateBox.checkState(),
                                            'rotateRightBox': GUI.rotateRightBox.checkState(),
                                            'rotateFirstBox': GUI.rotateFirstBox.checkState(),
@@ -1405,6 +1638,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         self.settingsVersion = self.settings.value('settingsVersion', '', type=str)
         self.lastPath = self.settings.value('lastPath', '', type=str)
         self.defaultOutputFolder = str(self.settings.value('defaultOutputFolder', '', type=str))
+        self.spreadLabelPreviewPercent = self.settings.value('spreadLabelPreviewPercent', 20, type=int)
+        self.spreadLabelMatchThreshold = self.settings.value('spreadLabelMatchThreshold', 0, type=int)
         if not os.path.exists(self.defaultOutputFolder):
             self.defaultOutputFolder = ''
 
@@ -1668,6 +1903,14 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         GUI.clearButton.clicked.connect(self.clearJobs)
         GUI.fileButton.clicked.connect(self.selectFile)
         GUI.directoryButton.clicked.connect(self.selectDir)
+        GUI.jobList.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        GUI.jobList.customContextMenuRequested.connect(self.showJobListContextMenu)
+        self.deleteJobShortcut = QShortcut(QKeySequence('Delete'), GUI.jobList)
+        self.deleteJobShortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        self.deleteJobShortcut.activated.connect(self.removeSelectedJobs)
+        self.backspaceJobShortcut = QShortcut(QKeySequence('Backspace'), GUI.jobList)
+        self.backspaceJobShortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        self.backspaceJobShortcut.activated.connect(self.removeSelectedJobs)
         GUI.editorButton.clicked.connect(self.selectFileMetaEditor)
         GUI.kofiButton.clicked.connect(self.openKofi)
         GUI.humbleButton.clicked.connect(self.openHumble)
@@ -1684,6 +1927,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         GUI.mozJpegBox.stateChanged.connect(self.toggleImageFormatBox)
         GUI.wallpaperBox.stateChanged.connect(self.toggleWallpaperBox)
         GUI.chunkSizeCheckBox.stateChanged.connect(self.togglechunkSizeCheckBox)
+        GUI.keepSourceResolutionBox.stateChanged.connect(self.toggleKeepSourceResolution)
+        GUI.keepSpreadsCombinedBox.stateChanged.connect(self.toggleKeepSpreadsCombined)
         GUI.deviceBox.activated.connect(self.changeDevice)
         GUI.formatBox.activated.connect(self.changeFormat)
         GUI.titleEdit.textChanged.connect(self.toggletitleEdit)
