@@ -5,6 +5,7 @@ setup.bat
 other/windows/kindlegen.exe
 dist/
 build/
+/KCC_*.spec
 KindleComicConverter*.egg-info/
 .idea/
 .vscode/
