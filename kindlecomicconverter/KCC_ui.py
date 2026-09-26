@@ -502,6 +502,23 @@ class Ui_mainWindow(object):
 
         self.gridLayout_2.addWidget(self.tempDirBox, 12, 2, 1, 1)
 
+        self.useSpreadLabelsBox = QCheckBox(self.optionWidget)
+        self.useSpreadLabelsBox.setObjectName(u"useSpreadLabelsBox")
+        self.useSpreadLabelsBox.setChecked(True)
+
+        self.gridLayout_2.addWidget(self.useSpreadLabelsBox, 12, 1, 1, 1)
+
+        self.skipLabeledSpreadsBox = QCheckBox(self.optionWidget)
+        self.skipLabeledSpreadsBox.setObjectName(u"skipLabeledSpreadsBox")
+        self.skipLabeledSpreadsBox.setChecked(True)
+
+        self.gridLayout_2.addWidget(self.skipLabeledSpreadsBox, 13, 1, 1, 1)
+
+        self.splitEpubChaptersBox = QCheckBox(self.optionWidget)
+        self.splitEpubChaptersBox.setObjectName(u"splitEpubChaptersBox")
+
+        self.gridLayout_2.addWidget(self.splitEpubChaptersBox, 12, 3, 1, 1)
+
         self.legacyPanelViewBox = QCheckBox(self.optionWidget)
         self.legacyPanelViewBox.setObjectName(u"legacyPanelViewBox")
 
@@ -931,6 +948,18 @@ class Ui_mainWindow(object):
 #endif // QT_CONFIG(tooltip)
         self.tempDirBox.setText(QCoreApplication.translate("mainWindow", u"Temp Directory", None))
 #if QT_CONFIG(tooltip)
+        self.useSpreadLabelsBox.setToolTip(QCoreApplication.translate("mainWindow", u"Apply saved spread labels from a JSON sidecar next to each source file.", None))
+#endif // QT_CONFIG(tooltip)
+        self.useSpreadLabelsBox.setText(QCoreApplication.translate("mainWindow", u"Use saved spread labels", None))
+#if QT_CONFIG(tooltip)
+        self.skipLabeledSpreadsBox.setToolTip(QCoreApplication.translate("mainWindow", u"Skip inputs that already have a valid spread-label sidecar. Hold Ctrl while clicking Label Spreads to relabel them anyway.", None))
+#endif // QT_CONFIG(tooltip)
+        self.skipLabeledSpreadsBox.setText(QCoreApplication.translate("mainWindow", u"Skip already labeled inputs", None))
+#if QT_CONFIG(tooltip)
+        self.splitEpubChaptersBox.setToolTip(QCoreApplication.translate("mainWindow", u"Create one CBZ per EPUB TOC chapter. Results are grouped in a separate output folder for each source book or volume.", None))
+#endif // QT_CONFIG(tooltip)
+        self.splitEpubChaptersBox.setText(QCoreApplication.translate("mainWindow", u"CBZ per EPUB chapter", None))
+#if QT_CONFIG(tooltip)
         self.legacyPanelViewBox.setToolTip(QCoreApplication.translate("mainWindow", u"Use legacy panel view method from KCC 6.\n"
 "\n"
 "Kind of works on firmwares 5.19.2 (before revert) and 5.19.3+", None))
@@ -938,7 +967,7 @@ class Ui_mainWindow(object):
         self.legacyPanelViewBox.setText(QCoreApplication.translate("mainWindow", u"Legacy Panel View", None))
         self.jpegQualityLabel.setText(QCoreApplication.translate("mainWindow", u"JPEG Quality:", None))
 #if QT_CONFIG(tooltip)
-        self.labelSpreadsButton.setToolTip(QCoreApplication.translate("mainWindow", u"Hold shift while clicking for a low quality preview.", None))
+        self.labelSpreadsButton.setToolTip(QCoreApplication.translate("mainWindow", u"Hold Shift for a low quality preview. Hold Ctrl to relabel inputs that already have saved spread labels.", None))
 #endif // QT_CONFIG(tooltip)
         self.labelSpreadsButton.setText(QCoreApplication.translate("mainWindow", u"Label Spreads", None))
         self.kofiButton.setText(QCoreApplication.translate("mainWindow", u"Support me on Ko-fi", None))

@@ -38,6 +38,7 @@ from zipfile import ZipFile, ZIP_STORED
 from tempfile import mkdtemp, gettempdir
 from shutil import move, copytree, rmtree
 from multiprocessing import Pool, cpu_count
+from urllib.parse import unquote, urldefrag
 from uuid import uuid4
 from natsort import os_sort_keygen, os_sorted
 from packaging.version import Version
@@ -1032,7 +1033,7 @@ def getWorkFolder(afile, options, workdir=None):
                                         temp_img_path
                                     ))
                                     if os.path.isfile(temp_img_path) and temp_img_path not in seen_image_paths:
-                                        ordered_image_paths.append(temp_img_path)
+                                        ordered_image_paths.append((i, temp_img_path))
                                         seen_image_paths.add(temp_img_path)
                                         break
                     # fallback if naive spine extraction fails
@@ -1043,9 +1044,21 @@ def getWorkFolder(afile, options, workdir=None):
                         workdir2 = mkdtemp('', 'KCC-', os.path.dirname(afile))
                     else:
                         workdir2 = mkdtemp('', 'KCC-')
-                    for i, img_path in enumerate(ordered_image_paths):
+                    chapter_starts = []
+                    if getattr(options, 'split_epub_chapters', False):
+                        chapter_starts = getEpubChapterStarts(opf_path, opf, manifest_dict, spine)
+                    for i, (spine_index, img_path) in enumerate(ordered_image_paths):
                         _, ext = os.path.splitext(img_path)
                         fullpath2 = os.path.join(workdir2, 'OEBPS', 'Images')
+                        if chapter_starts:
+                            chapter_index = 0
+                            for candidate_index, (start_index, _) in enumerate(chapter_starts):
+                                if start_index <= spine_index:
+                                    chapter_index = candidate_index
+                                else:
+                                    break
+                            chapter_name = f'{chapter_index + 1:04d} {chapter_starts[chapter_index][1]}'
+                            fullpath2 = os.path.join(fullpath2, chapter_name)
                         os.makedirs(fullpath2, exist_ok=True)
                         shutil.copyfile(img_path, os.path.join(fullpath2, f"{i}{ext}"))
                     rmtree(workdir, True)
@@ -1056,6 +1069,63 @@ def getWorkFolder(afile, options, workdir=None):
                 pass
     else:
         raise UserWarning("Failed to open source file/directory.")
+
+
+def getEpubChapterStarts(opf_path, opf, manifest_dict, spine):
+    document_indexes = {
+        os.path.normcase(os.path.normpath(os.path.join(
+            os.path.dirname(opf_path), unquote(urldefrag(href)[0])))): index
+        for index, item_id in enumerate(spine)
+        if (href := manifest_dict.get(item_id))
+    }
+    cover_reference = next((reference for reference in opf.findall(r'.//{*}guide/{*}reference')
+                            if reference.attrib.get('type', '').lower() == 'cover'), None)
+    cover_index = None
+    if cover_reference is not None and cover_reference.attrib.get('href'):
+        cover_path = os.path.normcase(os.path.normpath(os.path.join(
+            os.path.dirname(opf_path), unquote(urldefrag(cover_reference.attrib['href'])[0]))))
+        cover_index = document_indexes.get(cover_path)
+    entries = []
+    nav_item = next((item for item in opf.findall(r'.//{*}item')
+                     if 'nav' in item.attrib.get('properties', '').split()), None)
+    if nav_item is not None:
+        nav_path = os.path.normpath(os.path.join(os.path.dirname(opf_path), unquote(nav_item.attrib['href'])))
+        nav = ET.parse(nav_path)
+        toc = next((element for element in nav.findall(r'.//{*}nav')
+                    if element.attrib.get('{http://www.idpf.org/2007/ops}type') == 'toc'
+                    or element.attrib.get('type') == 'toc'), None)
+        if toc is not None:
+            entries = [(anchor.attrib.get('href'), ''.join(anchor.itertext()).strip())
+                       for anchor in toc.findall(r'.//{*}a')]
+            base_path = os.path.dirname(nav_path)
+    if not entries:
+        spine_element = opf.find(r'.//{*}spine')
+        toc_id = spine_element.attrib.get('toc') if spine_element is not None else None
+        ncx_item = opf.find(f".//{{*}}item[@id='{toc_id}']") if toc_id else None
+        if ncx_item is not None:
+            ncx_path = os.path.normpath(os.path.join(os.path.dirname(opf_path), unquote(ncx_item.attrib['href'])))
+            ncx = ET.parse(ncx_path)
+            entries = [(point.find(r'./{*}content').attrib.get('src'),
+                        ''.join(point.find(r'./{*}navLabel/{*}text').itertext()).strip())
+                       for point in ncx.findall(r'.//{*}navPoint')
+                       if point.find(r'./{*}content') is not None and point.find(r'./{*}navLabel/{*}text') is not None]
+            base_path = os.path.dirname(ncx_path)
+    starts = []
+    seen_indexes = set()
+    for href, title in entries:
+        if not href or not title:
+            continue
+        document_path = os.path.normcase(os.path.normpath(os.path.join(base_path, unquote(urldefrag(href)[0]))))
+        spine_index = document_indexes.get(document_path)
+        if spine_index is None and cover_index is not None and re.fullmatch(r'(?:front\s+)?cover', title, re.IGNORECASE):
+            spine_index = cover_index
+        if spine_index is not None and spine_index not in seen_indexes:
+            starts.append((spine_index, re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', title).strip('. ')))
+            seen_indexes.add(spine_index)
+    starts.sort(key=lambda entry: entry[0])
+    if starts and starts[0][0] > 0:
+        starts[0] = (0, starts[0][1])
+    return starts
 
 
 def getOutputFilename(srcpath, wantedname, ext, tomenumber):
@@ -1116,6 +1186,21 @@ def getOutputFilename(srcpath, wantedname, ext, tomenumber):
                 counter += 1
             filename = basename + '_kcc' + str(counter) + ext      
     return filename
+
+
+def getTomeChapter(tome, chapter_names):
+    images_path = os.path.join(tome, 'OEBPS', 'Images')
+    directories = [name for name in os_sorted(os.listdir(images_path))
+                   if os.path.isdir(os.path.join(images_path, name))]
+    if len(directories) != 1:
+        return images_path, None
+    directory = directories[0]
+    title = chapter_names.get(directory, directory)
+    order_match = re.match(r'^(\d{4})\s+', title)
+    if order_match:
+        title = f'{int(order_match.group(1)):02d} - {title[order_match.end():]}'
+    title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', title).strip('. ')
+    return os.path.join(images_path, directory), title or 'Chapter'
 
 
 def getMetadata(path, originalpath):
@@ -1511,6 +1596,8 @@ def makeParser():
                                 help="Output generated file to specified directory or file")
     output_options.add_argument("--output-subfolder", action="store_true", dest="output_subfolder", default=False,
                                 help="Create one subfolder per source book inside the output directory")
+    output_options.add_argument("--split-epub-chapters", action="store_true", dest="split_epub_chapters", default=False,
+                                help="Create one CBZ per EPUB TOC chapter in a source-book subfolder")
     output_options.add_argument("-t", "--title", action="store", dest="title", default="defaulttitle",
                                 help="Comic title [Default=filename or directory name]")
     output_options.add_argument("--metadatatitle", type=int, dest="metadatatitle", default=0,
@@ -1532,6 +1619,8 @@ def makeParser():
                                      "2: Consider every subdirectory as separate volume [Default=0]")
     output_options.add_argument("--spreadshift", action="store_true", dest="spreadshift", default=False,
                                 help="Shift first page to opposite side in landscape for spread alignment")
+    output_options.add_argument("--ignore-spread-labels", action="store_true", dest="ignore_spread_labels",
+                                default=False, help="Do not apply saved spread-label JSON sidecars")
     output_options.add_argument("--onepagelandscape", action="store_true", dest="onepagelandscape", default=False,
                                 help="Show a single centered page in landscape")
     output_options.add_argument("--norotate", action="store_true", dest="norotate", default=False,
@@ -1893,6 +1982,12 @@ def makeBook(source, fusion_cover_path=None, qtgui=None, job_progress=''):
     checkPre()
     if not options.filefusion:
         checkPre('LLL-')
+    split_epub_chapters = (options.split_epub_chapters and source.lower().endswith('.epub')
+                           and options.format == 'CBZ')
+    if options.split_epub_chapters and not split_epub_chapters:
+        raise UserWarning('EPUB chapter splitting requires an EPUB source and CBZ output.')
+    if split_epub_chapters:
+        options.output_subfolder = True
     print(f"{job_progress}Preparing source images...")
     path = getWorkFolder(source, options)
     print(f"{job_progress}Checking images...")
@@ -1930,31 +2025,49 @@ def makeBook(source, fusion_cover_path=None, qtgui=None, job_progress=''):
     detectSuboptimalProcessing(os.path.join(path, "OEBPS", "Images"), source)
     chapterNames, cover_path = sanitizeTree(os.path.join(path, 'OEBPS', 'Images'), options)
 
-    if os.path.exists(source+'.json'):
-        flattenTree(os.path.join(path, 'OEBPS', 'Images'))
-        chapterNames = {}
+    if split_epub_chapters:
+        chapter_directories = [entry for entry in os.scandir(os.path.join(path, 'OEBPS', 'Images')) if entry.is_dir()]
+        if not chapter_directories:
+            rmtree(path, True)
+            raise UserWarning('No EPUB TOC chapter boundaries could be matched to image content.')
+        options.batchsplit = 2
+
+    if not getattr(options, 'ignore_spread_labels', False) and os.path.exists(source+'.json'):
+        images_path = os.path.join(path, 'OEBPS', 'Images')
+        if not split_epub_chapters:
+            flattenTree(images_path)
+            chapterNames = {}
         cover_path = None
         with open(source+'.json') as f:
             data = json.load(f)
-            for root, _, files in os.walk(os.path.join(path, 'OEBPS', 'Images')):
-                sorted_files = os_sorted(files)
-                for i in range(len(sorted_files)):
-                    if not cover_path:
-                        cover_path = os.path.join(root, sorted_files[i])
-                    if i in data['spreads']:
-                        im1 = Image.open(os.path.join(root, sorted_files[i]))
-                        im2 = Image.open(os.path.join(root, sorted_files[i+1]))
-                        if not options.righttoleft:
-                            im1, im2 = im2, im1
-                        dst = Image.new('RGB', (im1.width + im2.width, im1.height))
-                        dst.paste(im2, (0, 0))
-                        dst.paste(im1, (im1.width, 0))
-                        base, _ = os.path.splitext(os.path.basename(sorted_files[i]))
-                        dst.save(os.path.join(path, 'OEBPS', 'Images', f'{base}-merged.png'))
-                        os.remove(os.path.join(root, sorted_files[i]))
-                        os.remove(os.path.join(root, sorted_files[i+1]))
-                        if not os.path.exists(cover_path):
-                            cover_path = os.path.join(root, f'{base}-merged.png')            
+        sorted_files = os_sorted([
+            os.path.join(root, name)
+            for root, _, files in os.walk(images_path)
+            for name in files
+        ])
+        if sorted_files:
+            cover_path = sorted_files[0]
+        for i in data['spreads']:
+            if i < 0 or i + 1 >= len(sorted_files):
+                continue
+            first_path = sorted_files[i]
+            second_path = sorted_files[i + 1]
+            if split_epub_chapters and os.path.dirname(first_path) != os.path.dirname(second_path):
+                print(f'{job_progress}WARNING: Skipped labeled spread across an EPUB chapter boundary.')
+                continue
+            with Image.open(first_path) as first_image, Image.open(second_path) as second_image:
+                if not options.righttoleft:
+                    first_image, second_image = second_image, first_image
+                merged = Image.new('RGB', (first_image.width + second_image.width, first_image.height))
+                merged.paste(second_image, (0, 0))
+                merged.paste(first_image, (first_image.width, 0))
+                base, _ = os.path.splitext(os.path.basename(first_path))
+                merged_path = os.path.join(os.path.dirname(first_path), f'{base}-merged.png')
+                merged.save(merged_path)
+            os.remove(first_path)
+            os.remove(second_path)
+            if not os.path.exists(cover_path):
+                cover_path = merged_path
 
     if options.filefusion:
         # Strip the fusion_0001_ sort prefix from makeFusion if present
@@ -2058,16 +2171,20 @@ def makeBook(source, fusion_cover_path=None, qtgui=None, job_progress=''):
             options.title = options.baseTitle + ' [' + str(tomeNumber) + '/' + str(len(tomes)) + ']'
         if options.format == 'CBZ':
             print(f"{job_progress}Creating CBZ file...")
-            if len(tomes) > 1:
+            chapter_path, chapter_title = getTomeChapter(tome, chapterNames) if split_epub_chapters else (
+                os.path.join(tome, 'OEBPS', 'Images'), None)
+            if chapter_title:
+                filepath.append(getOutputFilename(source, options.output, '.cbz', ' - ' + chapter_title))
+            elif len(tomes) > 1:
                 filepath.append(getOutputFilename(source, options.output, '.cbz', ' ' + str(tomeNumber)))
             else:
                 filepath.append(getOutputFilename(source, options.output, '.cbz', ''))
             if cover and (cover.smartcover or options.customcover):
-                cover.save_to_folder(os.path.join(tome, 'OEBPS', 'Images', '##cover.jpg'), tomeNumber, len(tomes))
+                cover.save_to_folder(os.path.join(chapter_path, '##cover.jpg'), tomeNumber, len(tomes))
             if options.comicinfo_xml:
-                with open(os.path.join(tome, 'OEBPS', 'Images', 'ComicInfo.xml'), 'wb') as xmlOutput:
+                with open(os.path.join(chapter_path, 'ComicInfo.xml'), 'wb') as xmlOutput:
                     xmlOutput.write(options.comicinfo_xml)
-            makeZIP(filepath[-1], os.path.join(tome, "OEBPS", "Images"), job_progress)
+            makeZIP(filepath[-1], chapter_path, job_progress)
         elif options.format == 'PDF':
             print(f"{job_progress}Creating PDF file with PyMuPDF...")
             # determine output filename based on source and tome count

@@ -47,9 +47,11 @@ class ProcessingControlsTest(unittest.TestCase):
         self.assertTrue(self.ui.rotateBox.isChecked())
         self.assertTrue(self.ui.labelSpreadsButton.isEnabled())
         self.assertTrue(self.ui.mangaBox.isEnabled())
-        self.assertTrue(self.ui.colorBox.isEnabled())
+        self.assertFalse(self.ui.colorBox.isEnabled())
         self.assertTrue(self.ui.croppingBox.isEnabled())
         self.assertTrue(self.ui.keepSourceResolutionBox.isEnabled())
+        self.assertTrue(self.ui.useSpreadLabelsBox.isEnabled())
+        self.assertTrue(self.ui.skipLabeledSpreadsBox.isEnabled())
 
         KCC_gui.KCCGUI.toggleDisableProcessing(
             self.controller, Qt.CheckState.Unchecked.value

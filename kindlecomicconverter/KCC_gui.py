@@ -70,8 +70,38 @@ def isDuplicateLinkedMessage(message, item_text, existing_messages):
     return '<a ' in message.lower() and item_text in existing_messages
 
 
+def loadSpreadLabels(source, image_count=None):
+    sidecar_path = source + '.json'
+    if not os.path.exists(sidecar_path):
+        return []
+    with open(sidecar_path, encoding='utf-8') as sidecar:
+        data = json.load(sidecar)
+    if not isinstance(data, dict):
+        raise ValueError('Spread sidecar must contain a JSON object.')
+    indexes = data.get('spreads', [])
+    if not isinstance(indexes, list):
+        raise ValueError('Spread sidecar must contain a spreads list.')
+    valid_indexes = {
+        index for index in indexes
+        if isinstance(index, int) and not isinstance(index, bool)
+        and index >= 0 and (image_count is None or index < image_count)
+    }
+    return [f'label-{index:04}.png' for index in sorted(valid_indexes)]
+
+
+def hasSavedSpreadLabels(source):
+    if not os.path.exists(source + '.json'):
+        return False
+    loadSpreadLabels(source)
+    return True
+
+
+def shouldSkipSpreadLabeling(source, skip_labeled, force_relabel):
+    return skip_labeled and not force_relabel and hasSavedSpreadLabels(source)
+
+
 IMAGE_PROCESSING_WIDGETS = (
-    'autoLevelBox', 'autocontrastBox', 'borderBox', 'eraseRainbowBox', 'forcePngRgbBox',
+    'autoLevelBox', 'autocontrastBox', 'borderBox', 'colorBox', 'eraseRainbowBox', 'forcePngRgbBox',
     'gammaBox', 'gammaWidget', 'interPanelCropBox', 'keepSpreadsCombinedBox',
     'legacyPanelViewBox', 'lightnovelBox', 'maximizeStrips', 'mozJpegBox', 'noQuantizeBox',
     'noRotateBox', 'pngLegacyBox', 'qualityBox', 'rotateFirstBox', 'rotateRightBox',
@@ -206,6 +236,7 @@ class SpreadLabelJobStatus(QWidget):
         self.timer.stop()
         self.frame = 0
         self.marker.clear()
+        self.setToolTip('')
 
     def setActive(self):
         self.setPending()
@@ -452,6 +483,10 @@ def get_options():
         options.output = GUI.targetDirectory
     if GUI.outputSubfolderBox.isChecked():
         options.output_subfolder = True
+    if not GUI.useSpreadLabelsBox.isChecked():
+        options.ignore_spread_labels = True
+    if GUI.splitEpubChaptersBox.isChecked():
+        options.split_epub_chapters = True
     if GUI.titleEdit.text():
         options.title = str(GUI.titleEdit.text())
     if GUI.authorEdit.text():
@@ -893,9 +928,9 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
             GUI.labelSpreadsButton.setEnabled(False)
 
     def runSpreadLabeling(self):
-        low_quality_preview = False
-        if QApplication.keyboardModifiers() == Qt.ShiftModifier:
-            low_quality_preview = True
+        modifiers = QApplication.keyboardModifiers()
+        low_quality_preview = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        force_relabel = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
         currentJobs = []
         status_header = None
         # TODO: make this a function since it's copy pasted
@@ -939,6 +974,17 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
             if self.labelSpreadsCancelRequested:
                 statuses[job].setCanceled()
                 return
+            try:
+                skip_labeling = shouldSkipSpreadLabeling(
+                    job, GUI.skipLabeledSpreadsBox.isChecked(), force_relabel
+                )
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+                self.addMessage(f'Could not read saved spread labels for {job}: {error}', 'warning')
+            else:
+                if skip_labeling:
+                    statuses[job].setComplete()
+                    statuses[job].setToolTip('Skipped because saved spread labels already exist.')
+                    continue
             images = []
             match_scores = {}
             preview_guides = {}
@@ -1029,6 +1075,10 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                         return
 
                 if images:
+                    try:
+                        spreads = loadSpreadLabels(job, len(images))
+                    except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+                        self.addMessage(f'Could not load saved spread labels for {job}: {error}', 'warning')
                     dlg = LabelSpreadsDialog(
                         APP.primaryScreen().availableGeometry().height(), images, spreads,
                         match_scores, preview_guides, start_index,
@@ -1602,6 +1652,10 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         else:
             GUI.outputSplit.setEnabled(False)
             GUI.outputSplit.setChecked(False)
+        split_epub_chapters_enabled = GUI.formats[str(GUI.formatBox.currentText())]['format'] == 'CBZ'
+        GUI.splitEpubChaptersBox.setEnabled(split_epub_chapters_enabled)
+        if not split_epub_chapters_enabled:
+            GUI.splitEpubChaptersBox.setChecked(False)
         if (GUI.formats[str(GUI.formatBox.currentText())]['format'] == 'EPUB-200MB' or
             GUI.formats[str(GUI.formatBox.currentText())]['format'] == 'MOBI+EPUB-200MB'):
             GUI.chunkSizeCheckBox.setEnabled(False)
@@ -1786,6 +1840,9 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                                            'fileFusionBox': GUI.fileFusionBox.checkState(),
                                            'defaultOutputFolderBox': GUI.defaultOutputFolderBox.checkState(),
                                            'outputSubfolderBox': GUI.outputSubfolderBox.checkState(),
+                                           'useSpreadLabelsBox': GUI.useSpreadLabelsBox.checkState(),
+                                           'skipLabeledSpreadsBox': GUI.skipLabeledSpreadsBox.checkState(),
+                                           'splitEpubChaptersBox': GUI.splitEpubChaptersBox.checkState(),
                                            'keepSpreadsCombinedBox': GUI.keepSpreadsCombinedBox.checkState(),
                                            'noRotateBox': GUI.noRotateBox.checkState(),
                                            'rotateRightBox': GUI.rotateRightBox.checkState(),

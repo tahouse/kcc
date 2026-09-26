@@ -997,6 +997,42 @@ Keeping this file may crash some readers like the Kobo native CBZ reader.</strin
          </property>
         </widget>
        </item>
+       <item row="12" column="1">
+        <widget class="QCheckBox" name="useSpreadLabelsBox">
+         <property name="toolTip">
+          <string>Apply saved spread labels from a JSON sidecar next to each source file.</string>
+         </property>
+         <property name="text">
+          <string>Use saved spread labels</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="1">
+        <widget class="QCheckBox" name="skipLabeledSpreadsBox">
+         <property name="toolTip">
+          <string>Skip inputs that already have a valid spread-label sidecar. Hold Ctrl while clicking Label Spreads to relabel them anyway.</string>
+         </property>
+         <property name="text">
+          <string>Skip already labeled inputs</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+        <item row="12" column="3">
+         <widget class="QCheckBox" name="splitEpubChaptersBox">
+          <property name="toolTip">
+           <string>Create one CBZ per EPUB TOC chapter. Results are grouped in a separate output folder for each source book or volume.</string>
+          </property>
+          <property name="text">
+           <string>CBZ per EPUB chapter</string>
+          </property>
+         </widget>
+        </item>
        <item row="10" column="2">
         <widget class="QCheckBox" name="legacyPanelViewBox">
          <property name="toolTip">
@@ -1083,7 +1119,7 @@ Kind of works on firmwares 5.19.2 (before revert) and 5.19.3+</string>
           </size>
          </property>
          <property name="toolTip">
-          <string>Hold shift while clicking for a low quality preview.</string>
+          <string>Hold Shift for a low quality preview. Hold Ctrl to relabel inputs that already have saved spread labels.</string>
          </property>
          <property name="text">
           <string>Label Spreads</string>

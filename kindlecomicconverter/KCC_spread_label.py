@@ -123,6 +123,8 @@ class LabelSpreadsDialog(QDialog):
         buttonLabel = QLabel('\n'.join(help_text))
         content.addWidget(buttonLabel)
         self.stop_button = QPushButton("Stop Label Spreads")
+        self.stop_button.setAutoDefault(False)
+        self.stop_button.setDefault(False)
         self.stop_button.clicked.connect(self.stopLabeling)
         layout.addWidget(self.stop_button, alignment=Qt.AlignmentFlag.AlignRight)
         # print(label.size())
@@ -245,6 +247,13 @@ class LabelSpreadsDialog(QDialog):
             self.thumbnail_list.scrollToItem(current_item)
         self.thumbnail_list.blockSignals(False)
 
+    def keyPressEvent(self, event):
+        if isinstance(event, QKeyEvent) and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            event.accept()
+            self.accept()
+            return
+        super().keyPressEvent(event)
+
     def keyReleaseEvent(self, event):
         # t = 20
         # b = 20
@@ -274,8 +283,6 @@ class LabelSpreadsDialog(QDialog):
                     self.spreads.remove(page)
                 self.rebuildThumbnails()
                 self.updatePreview()
-            elif event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
-                self.accept()
             else:
                 super().keyReleaseEvent(event)
         else:
