@@ -842,9 +842,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
 
     def labelSpreadsStart(self):
         if self.labelSpreadsRunning:
-            self.labelSpreadsCancelRequested = True
-            GUI.labelSpreadsButton.setText('Stopping Label Spreads...')
-            GUI.labelSpreadsButton.setEnabled(False)
+            self.requestSpreadLabelStop()
             return
         self.labelSpreadsRunning = True
         self.labelSpreadsCancelRequested = False
@@ -856,6 +854,17 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
             self.labelSpreadsCancelRequested = False
             GUI.labelSpreadsButton.setText('Label Spreads')
             GUI.labelSpreadsButton.setEnabled(True)
+
+    def requestSpreadLabelStop(self, update_button=True):
+        if not self.labelSpreadsRunning:
+            return
+        self.labelSpreadsCancelRequested = True
+        if self.spreadLabelDialog is not None:
+            self.spreadLabelDialog.stop_requested = True
+            self.spreadLabelDialog.reject()
+        if update_button:
+            GUI.labelSpreadsButton.setText('Stopping Label Spreads...')
+            GUI.labelSpreadsButton.setEnabled(False)
 
     def runSpreadLabeling(self):
         low_quality_preview = False
@@ -997,10 +1006,14 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                     dlg = LabelSpreadsDialog(
                         APP.primaryScreen().availableGeometry().height(), images, spreads,
                         match_scores, preview_guides, start_index,
-                        self.spreadLabelPreviewPercent, self.spreadLabelMatchThreshold
+                        self.spreadLabelPreviewPercent, self.spreadLabelMatchThreshold, MW
                     )
                     dlg.setWindowTitle(job)
-                    accepted = dlg.exec() == 1
+                    self.spreadLabelDialog = dlg
+                    try:
+                        accepted = dlg.exec() == 1
+                    finally:
+                        self.spreadLabelDialog = None
                     if dlg.stop_requested:
                         self.labelSpreadsCancelRequested = True
                     self.spreadLabelPreviewPercent = dlg.preview_slider.value()
@@ -1544,6 +1557,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         )
 
     def saveSettings(self, event):
+        self.requestSpreadLabelStop(update_button=False)
         if self.conversionAlive:
             GUI.convertButton.setEnabled(False)
             self.addMessage('The process will be interrupted. Please wait.', 'warning')
@@ -1678,6 +1692,7 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         self.spreadLabelMatchThreshold = self.settings.value('spreadLabelMatchThreshold', 0, type=int)
         self.labelSpreadsRunning = False
         self.labelSpreadsCancelRequested = False
+        self.spreadLabelDialog = None
         if not os.path.exists(self.defaultOutputFolder):
             self.defaultOutputFolder = ''
 

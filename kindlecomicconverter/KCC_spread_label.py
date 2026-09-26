@@ -9,8 +9,8 @@ from PySide6.QtWidgets import (
 
 class LabelSpreadsDialog(QDialog):
     def __init__(self, available_height, images, spreads, match_scores, preview_guides, pair_offset=0,
-                 preview_percent=20, match_threshold=0):
-        super().__init__()
+                 preview_percent=20, match_threshold=0, parent=None):
+        super().__init__(parent)
         self.index = 0
         self.all_images = images
         self.images = []
