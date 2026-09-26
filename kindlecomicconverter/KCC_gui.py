@@ -55,6 +55,11 @@ from . import KCC_ui
 from . import KCC_ui_editor
 
 
+def showSupportContent():
+    value = os.getenv('KCC_SHOW_SUPPORT_CONTENT', os.getenv('KCC_SHOW_DONATION_BUTTONS', '1'))
+    return value.lower() in ('1', 'true', 'yes', 'on')
+
+
 class QApplicationMessaging(QApplication):
     messageFromOtherInstance = Signal(bytes)
 
@@ -239,6 +244,9 @@ class VersionThread(QThread):
                                            'Accept': 'application/vnd.github.raw+json',
                                            'X-GitHub-Api-Version': '2022-11-28'}).json()
             for category, payloads in announcements.items():
+                if not showSupportContent() and any(
+                        name in category.lower() for name in ('humble', 'fanatical', 'kofi', 'donat', 'referral')):
+                    continue
                 for payload in payloads:
                     expiration = datetime.fromisoformat(payload['expiration'])
                     if expiration < datetime.now(timezone.utc):
@@ -1797,9 +1805,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         MW = kccwindow
         GUI = self
         self.setupUi(MW)
-        show_donation_buttons = os.getenv('KCC_SHOW_DONATION_BUTTONS', '1').lower() in ('1', 'true', 'yes', 'on')
-        GUI.kofiButton.setVisible(show_donation_buttons)
-        GUI.humbleButton.setVisible(show_donation_buttons)
+        GUI.kofiButton.setVisible(showSupportContent())
+        GUI.humbleButton.setVisible(showSupportContent())
         self.editor = KCCGUI_MetaEditor()
         self.icons = Icons()
         self.settings = QSettings('ciromattia', 'kcc10')
@@ -2056,6 +2063,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
             'FORUM': "http://www.mobileread.com/forums/showthread.php?t=207461",
             'DISCORD': "https://discord.com/invite/qj7wpnUHav",
         }
+        if not showSupportContent():
+            link_dict.pop('DONATE')
 
         link_html_list = [f'<a href="{v}">{k}</a>' for k, v in link_dict.items()]
         statusBarLabel = QLabel(f'<b>{" - ".join(link_html_list)}</b>')
