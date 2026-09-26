@@ -60,6 +60,16 @@ def showSupportContent():
     return value.lower() in ('1', 'true', 'yes', 'on')
 
 
+def isSupportAnnouncement(category, payload):
+    metadata = ' '.join((category, payload.get('name', ''), payload.get('link', ''))).lower()
+    return any(name in metadata for name in (
+        'humble', 'fanatical', 'kofi', 'ko-fi', 'donat', 'referral', 'linkedin'))
+
+
+def isDuplicateLinkedMessage(message, item_text, existing_messages):
+    return '<a ' in message.lower() and item_text in existing_messages
+
+
 class QApplicationMessaging(QApplication):
     messageFromOtherInstance = Signal(bytes)
 
@@ -244,10 +254,9 @@ class VersionThread(QThread):
                                            'Accept': 'application/vnd.github.raw+json',
                                            'X-GitHub-Api-Version': '2022-11-28'}).json()
             for category, payloads in announcements.items():
-                if not showSupportContent() and any(
-                        name in category.lower() for name in ('humble', 'fanatical', 'kofi', 'donat', 'referral')):
-                    continue
                 for payload in payloads:
+                    if not showSupportContent() and isSupportAnnouncement(category, payload):
+                        continue
                     expiration = datetime.fromisoformat(payload['expiration'])
                     if expiration < datetime.now(timezone.utc):
                         continue
@@ -1587,11 +1596,15 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         return s.get_data()
 
     def addMessage(self, message, icon, replace=False):
+        item_text = '   ' + self.stripTags(message)
+        existing_messages = (GUI.jobList.item(index).text() for index in range(GUI.jobList.count()))
+        if isDuplicateLinkedMessage(message, item_text, existing_messages):
+            return
         if icon != '':
             icon = getattr(self.icons, icon)
-            item = QListWidgetItem(icon, '   ' + self.stripTags(message))
+            item = QListWidgetItem(icon, item_text)
         else:
-            item = QListWidgetItem('   ' + self.stripTags(message))
+            item = QListWidgetItem(item_text)
         if replace:
             GUI.jobList.takeItem(GUI.jobList.count() - 1)
         # Due to lack of HTML support in QListWidgetItem we overlay text field with QLabel
