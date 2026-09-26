@@ -20,11 +20,15 @@
 
 import os
 import sys
+from pathlib import Path
+from dotenv import load_dotenv
 from . import __version__
 from .shared import dependencyCheck
 
 
 def start():
+    application_directory = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent.parent
+    load_dotenv(application_directory / '.env')
     dependencyCheck(3)
     from . import KCC_gui
     os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = "1"

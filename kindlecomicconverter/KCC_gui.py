@@ -1682,6 +1682,9 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         MW = kccwindow
         GUI = self
         self.setupUi(MW)
+        show_donation_buttons = os.getenv('KCC_SHOW_DONATION_BUTTONS', '1').lower() in ('1', 'true', 'yes', 'on')
+        GUI.kofiButton.setVisible(show_donation_buttons)
+        GUI.humbleButton.setVisible(show_donation_buttons)
         self.editor = KCCGUI_MetaEditor()
         self.icons = Icons()
         self.settings = QSettings('ciromattia', 'kcc10')

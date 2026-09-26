@@ -160,6 +160,7 @@ setuptools.setup(
         'numpy>=1.22.4',
         'packaging>=23.2',
         'PyMuPDF>=1.16.1',
+        'python-dotenv>=1.0.0,<2.0.0',
     ],
     classifiers=[],
     zip_safe=False,
