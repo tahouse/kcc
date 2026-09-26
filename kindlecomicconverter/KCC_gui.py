@@ -841,6 +841,23 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         menu.exec(GUI.jobList.viewport().mapToGlobal(position))
 
     def labelSpreadsStart(self):
+        if self.labelSpreadsRunning:
+            self.labelSpreadsCancelRequested = True
+            GUI.labelSpreadsButton.setText('Stopping Label Spreads...')
+            GUI.labelSpreadsButton.setEnabled(False)
+            return
+        self.labelSpreadsRunning = True
+        self.labelSpreadsCancelRequested = False
+        GUI.labelSpreadsButton.setText('Stop Label Spreads')
+        try:
+            self.runSpreadLabeling()
+        finally:
+            self.labelSpreadsRunning = False
+            self.labelSpreadsCancelRequested = False
+            GUI.labelSpreadsButton.setText('Label Spreads')
+            GUI.labelSpreadsButton.setEnabled(True)
+
+    def runSpreadLabeling(self):
         low_quality_preview = False
         if QApplication.keyboardModifiers() == Qt.ShiftModifier:
             low_quality_preview = True
@@ -884,6 +901,9 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
             statuses[job].setActive()
             GUI.jobList.scrollToItem(item)
             APP.processEvents()
+            if self.labelSpreadsCancelRequested:
+                statuses[job].setCanceled()
+                return
             images = []
             match_scores = {}
             preview_guides = {}
@@ -967,6 +987,11 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                         )
                     }
                     APP.processEvents()
+                    if self.labelSpreadsCancelRequested:
+                        statuses[job].setCanceled()
+                        rmtree(path, True)
+                        rmtree(workdir, True)
+                        return
 
                 if images:
                     dlg = LabelSpreadsDialog(
@@ -976,11 +1001,13 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                     )
                     dlg.setWindowTitle(job)
                     accepted = dlg.exec() == 1
+                    if dlg.stop_requested:
+                        self.labelSpreadsCancelRequested = True
                     self.spreadLabelPreviewPercent = dlg.preview_slider.value()
                     self.spreadLabelMatchThreshold = dlg.threshold_slider.value()
                     self.settings.setValue('spreadLabelPreviewPercent', self.spreadLabelPreviewPercent)
                     self.settings.setValue('spreadLabelMatchThreshold', self.spreadLabelMatchThreshold)
-                    if accepted:
+                    if accepted and not self.labelSpreadsCancelRequested:
                         with open(job+'.json', "w") as fp:
                             # TODO: not very clean to grab index from filename
                             spreads = [int(filename[6:10]) for filename in spreads]
@@ -993,6 +1020,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                     statuses[job].setCanceled()
                 rmtree(path, True)
                 rmtree(workdir, True)
+                if self.labelSpreadsCancelRequested:
+                    return
 
     def selectFileMetaEditor(self, sname):
         files = []
@@ -1647,6 +1676,8 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
         self.defaultOutputFolder = str(self.settings.value('defaultOutputFolder', '', type=str))
         self.spreadLabelPreviewPercent = self.settings.value('spreadLabelPreviewPercent', 20, type=int)
         self.spreadLabelMatchThreshold = self.settings.value('spreadLabelMatchThreshold', 0, type=int)
+        self.labelSpreadsRunning = False
+        self.labelSpreadsCancelRequested = False
         if not os.path.exists(self.defaultOutputFolder):
             self.defaultOutputFolder = ''
 

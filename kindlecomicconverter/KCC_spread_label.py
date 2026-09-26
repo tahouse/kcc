@@ -4,7 +4,7 @@ from PySide6.QtCore import (QSize, Qt)
 from PySide6.QtGui import (QColor, QFont, QIcon, QKeyEvent, QPainter, QPen, QPixmap)
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QHBoxLayout, QLabel, QListWidget,
-    QListWidgetItem, QSlider, QSpinBox, QVBoxLayout
+    QListWidgetItem, QPushButton, QSlider, QSpinBox, QVBoxLayout
 )
 
 class LabelSpreadsDialog(QDialog):
@@ -18,6 +18,7 @@ class LabelSpreadsDialog(QDialog):
         self.match_scores = match_scores
         self.preview_guides = preview_guides
         self.preview_percent = preview_percent
+        self.stop_requested = False
 
         self.setWindowTitle("TODO: Filename goes here")
         # self.setGeometry(APP.primaryScreen().availableGeometry())
@@ -121,6 +122,9 @@ class LabelSpreadsDialog(QDialog):
         ]
         buttonLabel = QLabel('\n'.join(help_text))
         content.addWidget(buttonLabel)
+        self.stop_button = QPushButton("Stop Label Spreads")
+        self.stop_button.clicked.connect(self.stopLabeling)
+        layout.addWidget(self.stop_button, alignment=Qt.AlignmentFlag.AlignRight)
         # print(label.size())
         # print(label.maximumSize())
         # l, t, r, b = layout.getContentsMargins()
@@ -129,6 +133,10 @@ class LabelSpreadsDialog(QDialog):
         self.filterChanged()
         #label.setScaledContents(True)
         
+
+    def stopLabeling(self):
+        self.stop_requested = True
+        self.reject()
         #label2.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         # pixmap2 = QPixmap(images[0]).scaledToHeight(self.frameGeometry().height() - t - b - t - b)
         # label2.setPixmap(pixmap2)
