@@ -729,40 +729,37 @@ class KCCGUI(KCC_ui.Ui_mainWindow):
                 GUI.jobList.scrollToBottom()
 
     def selectDir(self):
-        dialog = QFileDialog(MW, 'Select input folder(s)', self.lastPath)
-        dialog.setFileMode(QFileDialog.FileMode.Directory)
-        dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
-        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
-        dialog.findChild(QTreeView).setSelectionMode(QAbstractItemView.ExtendedSelection)
-
-        if dialog.exec():
-            dnames = dialog.selectedFiles()
-            extensions = self.selectRecursiveInputTypes()
-            if not extensions:
-                return
-            for dname in dnames:
-                if dname:
-                    self.lastPath = os.path.abspath(os.path.join(dname, os.pardir))
-            files = self.findRecursiveInputFiles(dnames, extensions)
-            if self.needClean:
-                self.needClean = False
-                GUI.jobList.clear()
-            queued = {
-                os.path.normcase(os.path.abspath(GUI.jobList.item(i).text()))
-                for i in range(GUI.jobList.count())
-                if GUI.jobList.item(i).icon().isNull()
-            }
-            added = 0
-            for filename in files:
-                normalized = os.path.normcase(os.path.abspath(filename))
-                if normalized not in queued:
-                    GUI.jobList.addItem(filename)
-                    queued.add(normalized)
-                    added += 1
-            if added:
-                GUI.jobList.scrollToBottom()
-            else:
-                self.addMessage('No new matching input files found in the selected folder(s).', 'warning')
+        dname = QFileDialog.getExistingDirectory(
+            MW, 'Select input folder', self.lastPath, QFileDialog.Option.ShowDirsOnly
+        )
+        if not dname:
+            return
+        if sys.platform.startswith('win'):
+            dname = dname.replace('/', '\\')
+        extensions = self.selectRecursiveInputTypes()
+        if not extensions:
+            return
+        self.lastPath = os.path.abspath(os.path.join(dname, os.pardir))
+        files = self.findRecursiveInputFiles([dname], extensions)
+        if self.needClean:
+            self.needClean = False
+            GUI.jobList.clear()
+        queued = {
+            os.path.normcase(os.path.abspath(GUI.jobList.item(i).text()))
+            for i in range(GUI.jobList.count())
+            if GUI.jobList.item(i).icon().isNull()
+        }
+        added = 0
+        for filename in files:
+            normalized = os.path.normcase(os.path.abspath(filename))
+            if normalized not in queued:
+                GUI.jobList.addItem(filename)
+                queued.add(normalized)
+                added += 1
+        if added:
+            GUI.jobList.scrollToBottom()
+        else:
+            self.addMessage('No new matching input files found in the selected folder.', 'warning')
 
     def findRecursiveInputFiles(self, directories, extensions):
         files = []
