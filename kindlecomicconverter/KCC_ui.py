@@ -512,7 +512,7 @@ class Ui_mainWindow(object):
         self.tempDirBox = QCheckBox(self.optionWidget)
         self.tempDirBox.setObjectName(u"tempDirBox")
 
-        self.gridLayout_2.addWidget(self.tempDirBox, 11, 2, 1, 1)
+        self.gridLayout_2.addWidget(self.tempDirBox, 12, 2, 1, 1)
 
         self.legacyPanelViewBox = QCheckBox(self.optionWidget)
         self.legacyPanelViewBox.setObjectName(u"legacyPanelViewBox")
